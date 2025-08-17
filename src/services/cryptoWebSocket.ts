@@ -1,3 +1,5 @@
+import { apiConfig } from '@/config/apiConfig';
+
 // Multi-API service for real-time crypto data
 export interface LivePriceData {
   symbol: string;
@@ -27,33 +29,78 @@ class MultiCryptoApiService {
   private lastApiCall = 0;
   private minApiInterval = 2000; // 2 seconds between calls
 
-  // API endpoints in priority order
-  private apis = [
-    {
-      name: 'CoinGecko',
-      endpoint: 'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=24h',
-      parser: this.parseCoinGeckoData.bind(this),
-      requiresKey: false,
-    },
-    {
-      name: 'Binance',
-      endpoint: 'https://api.binance.com/api/v3/ticker/24hr',
-      parser: this.parseBinanceData.bind(this),
-      requiresKey: false,
-    },
-    {
-      name: 'CryptoCompare',
-      endpoint: 'https://min-api.cryptocompare.com/data/pricemultifull?fsyms=BTC,ETH,BNB,XRP,ADA,SOL,DOGE,DOT,MATIC,LTC&tsyms=USD',
-      parser: this.parseCryptoCompareData.bind(this),
-      requiresKey: false,
-    },
-    {
-      name: 'Kraken',
-      endpoint: 'https://api.kraken.com/0/public/Ticker?pair=BTCUSD,ETHUSD,XRPUSD,ADAUSD,SOLUSD,DOGUSD',
-      parser: this.parseKrakenData.bind(this),
-      requiresKey: false,
+  // Generate API endpoints dynamically based on configuration
+  private getApiEndpoints() {
+    const endpoints = [];
+    
+    // CoinGecko endpoints (with API key if available)
+    const cgApiKey = apiConfig.coingeckoApiKey;
+    const cgParams = cgApiKey ? `&x_cg_demo_api_key=${cgApiKey}` : '';
+    
+    endpoints.push(
+      {
+        name: 'CoinGecko-Direct',
+        endpoint: `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=24h${cgParams}`,
+        parser: this.parseCoinGeckoData.bind(this),
+        requiresKey: false,
+      }
+    );
+
+    // CoinGecko with CORS proxies (if CORS proxy enabled)
+    if (apiConfig.enableCorsProxy) {
+      endpoints.push(
+        {
+          name: 'CoinGecko-Proxy1',
+          endpoint: 'https://api.allorigins.win/raw?url=' + encodeURIComponent(`https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=50&page=1&sparkline=false&price_change_percentage=24h${cgParams}`),
+          parser: this.parseCoinGeckoData.bind(this),
+          requiresKey: false,
+        },
+        {
+          name: 'CoinGecko-Proxy2', 
+          endpoint: 'https://corsproxy.io/?' + encodeURIComponent(`https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=50&page=1&sparkline=false&price_change_percentage=24h${cgParams}`),
+          parser: this.parseCoinGeckoData.bind(this),
+          requiresKey: false,
+        }
+      );
     }
-  ];
+
+    // CoinMarketCap (if API key available)
+    if (apiConfig.coinmarketcapApiKey) {
+      endpoints.push({
+        name: 'CoinMarketCap',
+        endpoint: `https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest?start=1&limit=100&convert=USD`,
+        parser: this.parseCoinMarketCapData.bind(this),
+        requiresKey: true,
+        headers: {
+          'X-CMC_PRO_API_KEY': apiConfig.coinmarketcapApiKey
+        }
+      });
+    }
+
+    // Other APIs
+    endpoints.push(
+      {
+        name: 'Binance',
+        endpoint: 'https://api.binance.com/api/v3/ticker/24hr',
+        parser: this.parseBinanceData.bind(this),
+        requiresKey: false,
+      },
+      {
+        name: 'CryptoCompare',
+        endpoint: 'https://min-api.cryptocompare.com/data/pricemultifull?fsyms=BTC,ETH,BNB,XRP,ADA,SOL,DOGE,DOT,MATIC,LTC,AVAX,UNI,LINK,BCH,XLM,VET,FIL,TRX,ETC,XMR&tsyms=USD',
+        parser: this.parseCryptoCompareData.bind(this),
+        requiresKey: false,
+      },
+      {
+        name: 'Kraken',
+        endpoint: 'https://api.kraken.com/0/public/Ticker?pair=BTCUSD,ETHUSD,XRPUSD,ADAUSD,SOLUSD',
+        parser: this.parseKrakenData.bind(this),
+        requiresKey: false,
+      }
+    );
+
+    return endpoints;
+  }
 
   private parseCoinGeckoData(data: any[]): CryptoApiResponse[] {
     return data.map(coin => ({
@@ -110,7 +157,17 @@ class MultiCryptoApiService {
       'DOGE': 'dogecoin',
       'DOT': 'polkadot',
       'MATIC': 'matic-network',
-      'LTC': 'litecoin'
+      'LTC': 'litecoin',
+      'AVAX': 'avalanche-2',
+      'UNI': 'uniswap',
+      'LINK': 'chainlink',
+      'BCH': 'bitcoin-cash',
+      'XLM': 'stellar',
+      'VET': 'vechain',
+      'FIL': 'filecoin',
+      'TRX': 'tron',
+      'ETC': 'ethereum-classic',
+      'XMR': 'monero'
     };
 
     Object.entries(data.RAW || {}).forEach(([symbol, coinData]: [string, any]) => {
@@ -161,6 +218,20 @@ class MultiCryptoApiService {
     return results;
   }
 
+  private parseCoinMarketCapData(data: any): CryptoApiResponse[] {
+    return (data.data || []).map((coin: any) => ({
+      id: coin.slug,
+      symbol: coin.symbol.toLowerCase(),
+      name: coin.name,
+      current_price: coin.quote.USD.price,
+      price_change_percentage_24h: coin.quote.USD.percent_change_24h,
+      market_cap: coin.quote.USD.market_cap,
+      total_volume: coin.quote.USD.volume_24h,
+      high_24h: coin.quote.USD.price * 1.02, // CMC doesn't provide 24h high/low
+      low_24h: coin.quote.USD.price * 0.98,
+    }));
+  }
+
   async getCryptoData(): Promise<CryptoApiResponse[]> {
     // Check cache first
     const cacheKey = 'all_cryptos';
@@ -176,13 +247,24 @@ class MultiCryptoApiService {
       await new Promise(resolve => setTimeout(resolve, this.minApiInterval - (now - this.lastApiCall)));
     }
 
+    // Get dynamic API endpoints
+    const apis = this.getApiEndpoints();
+    
     // Try each API in order
-    for (const api of this.apis) {
+    for (const api of apis) {
       try {
         console.log(`Trying ${api.name} API...`);
         this.lastApiCall = Date.now();
         
-        const response = await fetch(api.endpoint);
+        const fetchOptions: RequestInit = {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            ...(api.headers || {})
+          }
+        };
+        
+        const response = await fetch(api.endpoint, fetchOptions);
         
         if (response.ok) {
           const data = await response.json();
