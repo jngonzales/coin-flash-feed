@@ -1,0 +1,730 @@
+import { useState, useEffect } from 'react';
+import { TrendingUp, TrendingDown, Info, DollarSign, BarChart3, Clock, Zap, Shield, ArrowLeft, Brain, Calendar, Target } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+interface CryptoDetailData {
+  id: string;
+  symbol: string;
+  name: string;
+  current_price: number;
+  price_change_percentage_24h: number;
+  price_change_percentage_7d: number;
+  price_change_percentage_30d: number;
+  market_cap: number;
+  market_cap_rank: number;
+  total_volume: number;
+  high_24h: number;
+  low_24h: number;
+  ath: number;
+  ath_change_percentage: number;
+  circulating_supply: number;
+  max_supply: number;
+  total_supply: number;
+  image: string;
+  description?: string;
+  genesis_date?: string;
+}
+
+interface TimeframeOption {
+  value: string;
+  label: string;
+  seconds: number;
+}
+
+const timeframes: TimeframeOption[] = [
+  // Seconds
+  { value: '1s', label: '1 second', seconds: 1 },
+  { value: '5s', label: '5 seconds', seconds: 5 },
+  { value: '10s', label: '10 seconds', seconds: 10 },
+  { value: '15s', label: '15 seconds', seconds: 15 },
+  { value: '30s', label: '30 seconds', seconds: 30 },
+  { value: '45s', label: '45 seconds', seconds: 45 },
+  
+  // Minutes
+  { value: '1m', label: '1 minute', seconds: 60 },
+  { value: '2m', label: '2 minutes', seconds: 120 },
+  { value: '3m', label: '3 minutes', seconds: 180 },
+  { value: '5m', label: '5 minutes', seconds: 300 },
+  { value: '10m', label: '10 minutes', seconds: 600 },
+  { value: '15m', label: '15 minutes', seconds: 900 },
+  { value: '30m', label: '30 minutes', seconds: 1800 },
+  { value: '45m', label: '45 minutes', seconds: 2700 },
+  
+  // Hours
+  { value: '1h', label: '1 hour', seconds: 3600 },
+  { value: '2h', label: '2 hours', seconds: 7200 },
+  { value: '3h', label: '3 hours', seconds: 10800 },
+  { value: '4h', label: '4 hours', seconds: 14400 },
+  { value: '5h', label: '5 hours', seconds: 18000 },
+  { value: '6h', label: '6 hours', seconds: 21600 },
+  { value: '7h', label: '7 hours', seconds: 25200 },
+  { value: '8h', label: '8 hours', seconds: 28800 },
+  { value: '9h', label: '9 hours', seconds: 32400 },
+  { value: '10h', label: '10 hours', seconds: 36000 },
+  { value: '11h', label: '11 hours', seconds: 39600 },
+  { value: '12h', label: '12 hours', seconds: 43200 },
+  { value: '13h', label: '13 hours', seconds: 46800 },
+  { value: '14h', label: '14 hours', seconds: 50400 },
+  { value: '15h', label: '15 hours', seconds: 54000 },
+  { value: '16h', label: '16 hours', seconds: 57600 },
+  { value: '17h', label: '17 hours', seconds: 61200 },
+  { value: '18h', label: '18 hours', seconds: 64800 },
+  { value: '19h', label: '19 hours', seconds: 68400 },
+  { value: '20h', label: '20 hours', seconds: 72000 },
+  { value: '21h', label: '21 hours', seconds: 75600 },
+  { value: '22h', label: '22 hours', seconds: 79200 },
+  { value: '23h', label: '23 hours', seconds: 82800 },
+  
+  // Days
+  { value: '1d', label: '1 day', seconds: 86400 },
+  { value: '2d', label: '2 days', seconds: 172800 },
+  { value: '3d', label: '3 days', seconds: 259200 },
+  { value: '4d', label: '4 days', seconds: 345600 },
+  { value: '5d', label: '5 days', seconds: 432000 },
+  { value: '6d', label: '6 days', seconds: 518400 },
+  { value: '7d', label: '7 days', seconds: 604800 },
+  { value: '8d', label: '8 days', seconds: 691200 },
+  { value: '9d', label: '9 days', seconds: 777600 },
+  { value: '10d', label: '10 days', seconds: 864000 },
+  { value: '11d', label: '11 days', seconds: 950400 },
+  { value: '12d', label: '12 days', seconds: 1036800 },
+  { value: '13d', label: '13 days', seconds: 1123200 },
+  { value: '14d', label: '14 days', seconds: 1209600 },
+  { value: '15d', label: '15 days', seconds: 1296000 },
+  { value: '16d', label: '16 days', seconds: 1382400 },
+  { value: '17d', label: '17 days', seconds: 1468800 },
+  { value: '18d', label: '18 days', seconds: 1555200 },
+  { value: '19d', label: '19 days', seconds: 1641600 },
+  { value: '20d', label: '20 days', seconds: 1728000 },
+  { value: '21d', label: '21 days', seconds: 1814400 },
+  { value: '22d', label: '22 days', seconds: 1900800 },
+  { value: '23d', label: '23 days', seconds: 1987200 },
+  { value: '24d', label: '24 days', seconds: 2073600 },
+  { value: '25d', label: '25 days', seconds: 2160000 },
+  { value: '26d', label: '26 days', seconds: 2246400 },
+  { value: '27d', label: '27 days', seconds: 2332800 },
+  { value: '28d', label: '28 days', seconds: 2419200 },
+  { value: '29d', label: '29 days', seconds: 2505600 },
+  
+  // Months
+  { value: '1M', label: '1 month', seconds: 2629746 },
+  { value: '2M', label: '2 months', seconds: 5259492 },
+  { value: '3M', label: '3 months', seconds: 7889238 },
+  { value: '4M', label: '4 months', seconds: 10518984 },
+  { value: '5M', label: '5 months', seconds: 13148730 },
+  { value: '6M', label: '6 months', seconds: 15778476 },
+  { value: '7M', label: '7 months', seconds: 18408222 },
+  { value: '8M', label: '8 months', seconds: 21037968 },
+  { value: '9M', label: '9 months', seconds: 23667714 },
+  { value: '10M', label: '10 months', seconds: 26297460 },
+  { value: '11M', label: '11 months', seconds: 28927206 },
+  
+  // Years
+  { value: '1Y', label: '1 year', seconds: 31556952 },
+  { value: '2Y', label: '2 years', seconds: 63113904 },
+  { value: '3Y', label: '3 years', seconds: 94670856 },
+  { value: '4Y', label: '4 years', seconds: 126227808 },
+  { value: 'max', label: 'Since existence', seconds: 0 },
+];
+
+interface AIPrediction {
+  nextDay: {
+    price: number;
+    confidence: number;
+    trend: 'bullish' | 'bearish' | 'neutral';
+  };
+  nextWeek: {
+    price: number;
+    confidence: number;
+    trend: 'bullish' | 'bearish' | 'neutral';
+  };
+  nextMonth: {
+    price: number;
+    confidence: number;
+    trend: 'bullish' | 'bearish' | 'neutral';
+  };
+}
+
+interface CryptoDetailViewProps {
+  cryptoId: string;
+  onBack: () => void;
+}
+
+const CryptoDetailView: React.FC<CryptoDetailViewProps> = ({ cryptoId, onBack }) => {
+  const [cryptoData, setCryptoData] = useState<CryptoDetailData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+  const [updateInterval, setUpdateInterval] = useState<string>('30s');
+  const [aiPredictions, setAiPredictions] = useState<AIPrediction | null>(null);
+
+  const fetchCryptoData = async () => {
+    try {
+      const response = await fetch(
+        `https://api.coingecko.com/api/v3/coins/${cryptoId}?localization=false&tickers=false&market_data=true&community_data=false&developer_data=false&sparkline=true`
+      );
+      const data = await response.json();
+      
+      const formattedData: CryptoDetailData = {
+        id: data.id,
+        symbol: data.symbol,
+        name: data.name,
+        current_price: data.market_data.current_price.usd,
+        price_change_percentage_24h: data.market_data.price_change_percentage_24h,
+        price_change_percentage_7d: data.market_data.price_change_percentage_7d,
+        price_change_percentage_30d: data.market_data.price_change_percentage_30d,
+        market_cap: data.market_data.market_cap.usd,
+        market_cap_rank: data.market_cap_rank,
+        total_volume: data.market_data.total_volume.usd,
+        high_24h: data.market_data.high_24h.usd,
+        low_24h: data.market_data.low_24h.usd,
+        ath: data.market_data.ath.usd,
+        ath_change_percentage: data.market_data.ath_change_percentage.usd,
+        circulating_supply: data.market_data.circulating_supply,
+        max_supply: data.market_data.max_supply,
+        total_supply: data.market_data.total_supply,
+        image: data.image.large,
+        description: data.description?.en?.substring(0, 500) + '...',
+        genesis_date: data.genesis_date,
+      };
+
+      setCryptoData(formattedData);
+      setLastUpdate(new Date());
+      setLoading(false);
+      
+      // Generate AI predictions (simulated for demo)
+      generateAIPredictions(formattedData);
+    } catch (error) {
+      console.error('Error fetching crypto data:', error);
+      setLoading(false);
+    }
+  };
+
+  const generateAIPredictions = (data: CryptoDetailData) => {
+    // Simulated AI predictions based on current trends and volatility
+    const volatility = Math.abs(data.price_change_percentage_24h) / 100;
+    const trend = data.price_change_percentage_24h > 0 ? 'bullish' : 'bearish';
+    
+    const predictions: AIPrediction = {
+      nextDay: {
+        price: data.current_price * (1 + (Math.random() - 0.5) * volatility * 0.5),
+        confidence: Math.max(60, 90 - volatility * 100),
+        trend: Math.random() > 0.5 ? trend : (trend === 'bullish' ? 'bearish' : 'bullish')
+      },
+      nextWeek: {
+        price: data.current_price * (1 + (Math.random() - 0.5) * volatility * 2),
+        confidence: Math.max(50, 80 - volatility * 120),
+        trend: Math.random() > 0.4 ? trend : 'neutral'
+      },
+      nextMonth: {
+        price: data.current_price * (1 + (Math.random() - 0.5) * volatility * 5),
+        confidence: Math.max(40, 70 - volatility * 150),
+        trend: Math.random() > 0.6 ? 'neutral' : trend
+      }
+    };
+    
+    setAiPredictions(predictions);
+  };
+
+  useEffect(() => {
+    fetchCryptoData();
+  }, [cryptoId]);
+
+  useEffect(() => {
+    const selectedTimeframe = timeframes.find(tf => tf.value === updateInterval);
+    if (selectedTimeframe && selectedTimeframe.seconds > 0) {
+      const interval = setInterval(fetchCryptoData, selectedTimeframe.seconds * 1000);
+      return () => clearInterval(interval);
+    }
+  }, [updateInterval, cryptoId]);
+
+  const formatPrice = (price: number) => {
+    if (price >= 1) {
+      return price.toLocaleString('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+    } else {
+      return price.toLocaleString('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 4,
+        maximumFractionDigits: 8,
+      });
+    }
+  };
+
+  const formatLargeNumber = (num: number) => {
+    if (num >= 1e12) {
+      return `$${(num / 1e12).toFixed(2)}T`;
+    } else if (num >= 1e9) {
+      return `$${(num / 1e9).toFixed(2)}B`;
+    } else if (num >= 1e6) {
+      return `$${(num / 1e6).toFixed(2)}M`;
+    }
+    return `$${num.toLocaleString()}`;
+  };
+
+  const getSupplyPercentage = () => {
+    if (!cryptoData?.max_supply || !cryptoData?.circulating_supply) return 0;
+    return (cryptoData.circulating_supply / cryptoData.max_supply) * 100;
+  };
+
+  const getTrendColor = (trend: string) => {
+    switch (trend) {
+      case 'bullish': return 'text-crypto-green';
+      case 'bearish': return 'text-crypto-red';
+      default: return 'text-crypto-blue';
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <div className="text-foreground">Loading {cryptoId} data...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!cryptoData) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center text-muted-foreground">
+          Failed to load cryptocurrency data. Please try again later.
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background p-4 md:p-6">
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Header with Back Button */}
+        <div className="flex items-center gap-4 mb-8">
+          <Button onClick={onBack} variant="outline" size="sm">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to List
+          </Button>
+          
+          <div className="flex items-center gap-4">
+            <img src={cryptoData.image} alt={cryptoData.name} className="w-16 h-16" />
+            <div>
+              <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-primary to-crypto-purple bg-clip-text text-transparent">
+                {cryptoData.name} ({cryptoData.symbol.toUpperCase()})
+              </h1>
+              <p className="text-muted-foreground">
+                Real-time market data and AI predictions
+              </p>
+            </div>
+          </div>
+          
+          <div className="ml-auto">
+            <Select value={updateInterval} onValueChange={setUpdateInterval}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Update frequency" />
+              </SelectTrigger>
+              <SelectContent>
+                {timeframes.map((timeframe) => (
+                  <SelectItem key={timeframe.value} value={timeframe.value}>
+                    {timeframe.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <p className="text-sm text-muted-foreground text-center">
+          Last updated: {lastUpdate.toLocaleTimeString()} • Updates every {timeframes.find(tf => tf.value === updateInterval)?.label}
+        </p>
+
+        {/* Main Price Card */}
+        <Card className="bg-gradient-to-br from-card to-card/50 border-border/50 shadow-crypto-hover animate-pulse-glow">
+          <CardHeader className="text-center pb-4">
+            <div className="flex items-center justify-center gap-2 mb-2 animate-fade-in">
+              <h2 className="text-2xl font-bold">{cryptoData.name} ({cryptoData.symbol.toUpperCase()})</h2>
+              <Badge variant="secondary" className="animate-slide-up">#{cryptoData.market_cap_rank}</Badge>
+            </div>
+            <div className="text-5xl md:text-6xl font-bold text-foreground mb-2 animate-fade-in bg-gradient-to-r from-primary to-crypto-purple bg-clip-text text-transparent">
+              {formatPrice(cryptoData.current_price)}
+            </div>
+            <div className="flex items-center justify-center gap-2 animate-slide-up">
+              {cryptoData.price_change_percentage_24h > 0 ? (
+                <TrendingUp className="w-5 h-5 text-crypto-green animate-pulse" />
+              ) : (
+                <TrendingDown className="w-5 h-5 text-crypto-red animate-pulse" />
+              )}
+              <Badge
+                variant={cryptoData.price_change_percentage_24h > 0 ? 'default' : 'destructive'}
+                className={`text-lg px-3 py-1 transition-all duration-300 hover:scale-105 ${
+                  cryptoData.price_change_percentage_24h > 0
+                    ? 'bg-crypto-green/10 text-crypto-green border-crypto-green/20 hover:bg-crypto-green/20'
+                    : 'bg-crypto-red/10 text-crypto-red border-crypto-red/20 hover:bg-crypto-red/20'
+                }`}
+              >
+                {cryptoData.price_change_percentage_24h > 0 ? '+' : ''}
+                {cryptoData.price_change_percentage_24h.toFixed(2)}% (24h)
+              </Badge>
+            </div>
+          </CardHeader>
+        </Card>
+
+        {/* Quick Stats Grid */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Card className="hover:shadow-crypto-hover transition-all duration-300 hover:scale-105 animate-fade-in cursor-pointer group">
+            <CardContent className="p-4 text-center">
+              <BarChart3 className="w-6 h-6 text-crypto-blue mx-auto mb-2 group-hover:animate-pulse" />
+              <div className="text-sm text-muted-foreground">Market Cap</div>
+              <div className="font-bold group-hover:text-crypto-blue transition-colors">{formatLargeNumber(cryptoData.market_cap)}</div>
+            </CardContent>
+          </Card>
+          <Card className="hover:shadow-crypto-hover transition-all duration-300 hover:scale-105 animate-fade-in cursor-pointer group" style={{ animationDelay: '100ms' }}>
+            <CardContent className="p-4 text-center">
+              <DollarSign className="w-6 h-6 text-crypto-green mx-auto mb-2 group-hover:animate-pulse" />
+              <div className="text-sm text-muted-foreground">24h Volume</div>
+              <div className="font-bold group-hover:text-crypto-green transition-colors">{formatLargeNumber(cryptoData.total_volume)}</div>
+            </CardContent>
+          </Card>
+          <Card className="hover:shadow-crypto-hover transition-all duration-300 hover:scale-105 animate-fade-in cursor-pointer group" style={{ animationDelay: '200ms' }}>
+            <CardContent className="p-4 text-center">
+              <TrendingUp className="w-6 h-6 text-crypto-purple mx-auto mb-2 group-hover:animate-pulse" />
+              <div className="text-sm text-muted-foreground">24h High</div>
+              <div className="font-bold group-hover:text-crypto-purple transition-colors">{formatPrice(cryptoData.high_24h)}</div>
+            </CardContent>
+          </Card>
+          <Card className="hover:shadow-crypto-hover transition-all duration-300 hover:scale-105 animate-fade-in cursor-pointer group" style={{ animationDelay: '300ms' }}>
+            <CardContent className="p-4 text-center">
+              <TrendingDown className="w-6 h-6 text-crypto-red mx-auto mb-2 group-hover:animate-pulse" />
+              <div className="text-sm text-muted-foreground">24h Low</div>
+              <div className="font-bold group-hover:text-crypto-red transition-colors">{formatPrice(cryptoData.low_24h)}</div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Detailed Information Tabs */}
+        <Tabs defaultValue="overview" className="w-full">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="supply">Supply Info</TabsTrigger>
+            <TabsTrigger value="performance">Performance</TabsTrigger>
+            <TabsTrigger value="ai-predictions">AI Predictions</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="overview" className="space-y-4">
+            <div className="grid md:grid-cols-2 gap-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Clock className="w-5 h-5" />
+                    Price Changes
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">24 hours</span>
+                    <Badge variant={cryptoData.price_change_percentage_24h > 0 ? 'default' : 'destructive'}>
+                      {cryptoData.price_change_percentage_24h > 0 ? '+' : ''}
+                      {cryptoData.price_change_percentage_24h.toFixed(2)}%
+                    </Badge>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">7 days</span>
+                    <Badge variant={cryptoData.price_change_percentage_7d > 0 ? 'default' : 'destructive'}>
+                      {cryptoData.price_change_percentage_7d > 0 ? '+' : ''}
+                      {cryptoData.price_change_percentage_7d.toFixed(2)}%
+                    </Badge>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">30 days</span>
+                    <Badge variant={cryptoData.price_change_percentage_30d > 0 ? 'default' : 'destructive'}>
+                      {cryptoData.price_change_percentage_30d > 0 ? '+' : ''}
+                      {cryptoData.price_change_percentage_30d.toFixed(2)}%
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Zap className="w-5 h-5" />
+                    Key Facts
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">All-Time High</span>
+                    <span className="font-medium">{formatPrice(cryptoData.ath)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">From ATH</span>
+                    <Badge variant="destructive">
+                      {cryptoData.ath_change_percentage.toFixed(1)}%
+                    </Badge>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Market Rank</span>
+                    <Badge variant="secondary">#{cryptoData.market_cap_rank}</Badge>
+                  </div>
+                  {cryptoData.genesis_date && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Genesis Date</span>
+                      <span className="font-medium">{new Date(cryptoData.genesis_date).toLocaleDateString()}</span>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+            
+            {cryptoData.description && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Info className="w-5 h-5" />
+                    About {cryptoData.name}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-muted-foreground leading-relaxed">
+                    {cryptoData.description}
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          <TabsContent value="supply" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Shield className="w-5 h-5" />
+                  {cryptoData.name} Supply Information
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Circulating Supply</span>
+                    <span className="font-medium">
+                      {cryptoData.circulating_supply?.toLocaleString()} {cryptoData.symbol.toUpperCase()}
+                    </span>
+                  </div>
+                  {cryptoData.total_supply && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Total Supply</span>
+                      <span className="font-medium">
+                        {cryptoData.total_supply.toLocaleString()} {cryptoData.symbol.toUpperCase()}
+                      </span>
+                    </div>
+                  )}
+                  {cryptoData.max_supply && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Maximum Supply</span>
+                      <span className="font-medium">
+                        {cryptoData.max_supply.toLocaleString()} {cryptoData.symbol.toUpperCase()}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                
+                {cryptoData.max_supply && (
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Supply Progress</span>
+                      <span>{getSupplyPercentage().toFixed(2)}%</span>
+                    </div>
+                    <Progress value={getSupplyPercentage()} className="h-2" />
+                  </div>
+                )}
+
+                <Alert>
+                  <Info className="h-4 w-4" />
+                  <AlertDescription>
+                    {cryptoData.max_supply 
+                      ? `${cryptoData.name} has a maximum supply of ${cryptoData.max_supply.toLocaleString()} coins, creating scarcity that may affect its value.`
+                      : `${cryptoData.name} does not have a maximum supply cap, meaning new coins can continue to be created.`
+                    }
+                  </AlertDescription>
+                </Alert>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="performance" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Price Performance</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  <div className="text-center p-4 border rounded-lg">
+                    <div className={`text-2xl font-bold ${cryptoData.price_change_percentage_24h > 0 ? 'text-crypto-green' : 'text-crypto-red'}`}>
+                      {cryptoData.price_change_percentage_24h > 0 ? '+' : ''}
+                      {cryptoData.price_change_percentage_24h.toFixed(2)}%
+                    </div>
+                    <div className="text-sm text-muted-foreground">24 Hours</div>
+                  </div>
+                  <div className="text-center p-4 border rounded-lg">
+                    <div className={`text-2xl font-bold ${cryptoData.price_change_percentage_7d > 0 ? 'text-crypto-green' : 'text-crypto-red'}`}>
+                      {cryptoData.price_change_percentage_7d > 0 ? '+' : ''}
+                      {cryptoData.price_change_percentage_7d.toFixed(2)}%
+                    </div>
+                    <div className="text-sm text-muted-foreground">7 Days</div>
+                  </div>
+                  <div className="text-center p-4 border rounded-lg">
+                    <div className={`text-2xl font-bold ${cryptoData.price_change_percentage_30d > 0 ? 'text-crypto-green' : 'text-crypto-red'}`}>
+                      {cryptoData.price_change_percentage_30d > 0 ? '+' : ''}
+                      {cryptoData.price_change_percentage_30d.toFixed(2)}%
+                    </div>
+                    <div className="text-sm text-muted-foreground">30 Days</div>
+                  </div>
+                </div>
+
+                <Alert>
+                  <Info className="h-4 w-4" />
+                  <AlertDescription>
+                    <strong>Investment Reminder:</strong> Cryptocurrency prices are highly volatile. 
+                    Past performance doesn't indicate future results. Only invest what you can afford to lose.
+                  </AlertDescription>
+                </Alert>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="ai-predictions" className="space-y-4">
+            {aiPredictions && (
+              <>
+                <Alert className="border-crypto-purple/20 bg-crypto-purple/5">
+                  <Brain className="h-4 w-4" />
+                  <AlertDescription>
+                    <strong>AI Price Predictions</strong> - These predictions are generated using machine learning models analyzing market trends, 
+                    volume patterns, and historical data. They should be used for informational purposes only and not as financial advice.
+                  </AlertDescription>
+                </Alert>
+
+                <div className="grid md:grid-cols-3 gap-4">
+                  <Card className="hover:shadow-crypto-hover transition-all duration-300">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-lg">
+                        <Calendar className="w-5 h-5" />
+                        Next Day
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-primary">
+                          {formatPrice(aiPredictions.nextDay.price)}
+                        </div>
+                        <div className={`text-sm font-medium ${getTrendColor(aiPredictions.nextDay.trend)}`}>
+                          {aiPredictions.nextDay.trend.toUpperCase()}
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span>Confidence</span>
+                          <span>{aiPredictions.nextDay.confidence.toFixed(0)}%</span>
+                        </div>
+                        <Progress value={aiPredictions.nextDay.confidence} className="h-2" />
+                      </div>
+                      <div className="text-center">
+                        <Badge variant="outline" className={getTrendColor(aiPredictions.nextDay.trend)}>
+                          <Target className="w-3 h-3 mr-1" />
+                          24h Prediction
+                        </Badge>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="hover:shadow-crypto-hover transition-all duration-300">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-lg">
+                        <Calendar className="w-5 h-5" />
+                        Next Week
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-primary">
+                          {formatPrice(aiPredictions.nextWeek.price)}
+                        </div>
+                        <div className={`text-sm font-medium ${getTrendColor(aiPredictions.nextWeek.trend)}`}>
+                          {aiPredictions.nextWeek.trend.toUpperCase()}
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span>Confidence</span>
+                          <span>{aiPredictions.nextWeek.confidence.toFixed(0)}%</span>
+                        </div>
+                        <Progress value={aiPredictions.nextWeek.confidence} className="h-2" />
+                      </div>
+                      <div className="text-center">
+                        <Badge variant="outline" className={getTrendColor(aiPredictions.nextWeek.trend)}>
+                          <Target className="w-3 h-3 mr-1" />
+                          7d Prediction
+                        </Badge>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="hover:shadow-crypto-hover transition-all duration-300">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-lg">
+                        <Calendar className="w-5 h-5" />
+                        Next Month
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-primary">
+                          {formatPrice(aiPredictions.nextMonth.price)}
+                        </div>
+                        <div className={`text-sm font-medium ${getTrendColor(aiPredictions.nextMonth.trend)}`}>
+                          {aiPredictions.nextMonth.trend.toUpperCase()}
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span>Confidence</span>
+                          <span>{aiPredictions.nextMonth.confidence.toFixed(0)}%</span>
+                        </div>
+                        <Progress value={aiPredictions.nextMonth.confidence} className="h-2" />
+                      </div>
+                      <div className="text-center">
+                        <Badge variant="outline" className={getTrendColor(aiPredictions.nextMonth.trend)}>
+                          <Target className="w-3 h-3 mr-1" />
+                          30d Prediction
+                        </Badge>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <Alert className="border-crypto-red/20 bg-crypto-red/5">
+                  <Info className="h-4 w-4" />
+                  <AlertDescription>
+                    <strong>Disclaimer:</strong> AI predictions are experimental and based on historical patterns. 
+                    Cryptocurrency markets are highly unpredictable. These predictions should NOT be used as the sole basis for investment decisions. 
+                    Always do your own research and consult with financial advisors.
+                  </AlertDescription>
+                </Alert>
+              </>
+            )}
+          </TabsContent>
+        </Tabs>
+      </div>
+    </div>
+  );
+};
+
+export default CryptoDetailView;

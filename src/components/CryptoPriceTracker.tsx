@@ -14,7 +14,11 @@ interface CryptoData {
   image: string;
 }
 
-const CryptoPriceTracker = () => {
+interface CryptoPriceTrackerProps {
+  onCryptoClick: (cryptoId: string) => void;
+}
+
+const CryptoPriceTracker: React.FC<CryptoPriceTrackerProps> = ({ onCryptoClick }) => {
   const [cryptos, setCryptos] = useState<CryptoData[]>([]);
   const [filteredCryptos, setFilteredCryptos] = useState<CryptoData[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -100,7 +104,7 @@ const CryptoPriceTracker = () => {
                 CryptoTracker
               </h1>
               <p className="text-muted-foreground text-sm">
-                Last updated: {lastUpdate.toLocaleTimeString()}
+                Last updated: {lastUpdate.toLocaleTimeString()} • Click any coin for detailed analysis
               </p>
             </div>
             <div className="relative max-w-md">
@@ -124,6 +128,7 @@ const CryptoPriceTracker = () => {
               key={crypto.id} 
               className="bg-card border-border hover:bg-accent/50 transition-all duration-300 hover:shadow-crypto-hover hover:scale-[1.02] animate-fade-in group cursor-pointer"
               style={{ animationDelay: `${index * 50}ms` }}
+              onClick={() => onCryptoClick(crypto.id)}
             >
               <CardContent className="p-4 md:p-6">
                 <div className="flex items-center justify-between gap-4">
