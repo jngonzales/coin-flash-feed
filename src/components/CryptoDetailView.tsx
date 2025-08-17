@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { TrendingUp, TrendingDown, Info, DollarSign, BarChart3, Clock, Zap, Shield, ArrowLeft, Brain, Calendar, Target } from 'lucide-react';
+import { TrendingUp, TrendingDown, Info, DollarSign, BarChart3, Clock, Zap, Shield, ArrowLeft, Brain, Calendar, Target, LineChart, Activity, TrendingDownIcon, Volume2, Maximize2, Star, Bell, Copy, ExternalLink } from 'lucide-react';
+import { useWatchlist } from '@/hooks/useWatchlist';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -7,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { LineChart as RechartsLineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart, BarChart, Bar, ComposedChart } from 'recharts';
 
 interface CryptoDetailData {
   id: string;
@@ -29,6 +31,24 @@ interface CryptoDetailData {
   image: string;
   description?: string;
   genesis_date?: string;
+}
+
+interface PriceHistoryPoint {
+  timestamp: number;
+  price: number;
+  volume?: number;
+  market_cap?: number;
+  date: string;
+  time: string;
+}
+
+interface TechnicalIndicators {
+  sma_20?: number;
+  sma_50?: number;
+  rsi?: number;
+  macd?: number;
+  bollinger_upper?: number;
+  bollinger_lower?: number;
 }
 
 interface TimeframeOption {
@@ -162,6 +182,15 @@ const CryptoDetailView: React.FC<CryptoDetailViewProps> = ({ cryptoId, onBack })
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [updateInterval, setUpdateInterval] = useState<string>('30s');
   const [aiPredictions, setAiPredictions] = useState<AIPrediction | null>(null);
+  const [priceHistory, setPriceHistory] = useState<PriceHistoryPoint[]>([]);
+  const [historyTimeframe, setHistoryTimeframe] = useState<string>('7d');
+  const [chartType, setChartType] = useState<'line' | 'area' | 'candlestick'>('area');
+  const [showVolume, setShowVolume] = useState(true);
+  const [technicalIndicators, setTechnicalIndicators] = useState<TechnicalIndicators>({});
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  
+  const { addToWatchlist, removeFromWatchlist, isInWatchlist } = useWatchlist();
 
   const fetchCryptoData = async () => {
     try {
@@ -196,13 +225,142 @@ const CryptoDetailView: React.FC<CryptoDetailViewProps> = ({ cryptoId, onBack })
       setCryptoData(formattedData);
       setLastUpdate(new Date());
       setLoading(false);
+      setError(null);
       
       // Generate AI predictions (simulated for demo)
       generateAIPredictions(formattedData);
     } catch (error) {
       console.error('Error fetching crypto data:', error);
+      setError('Failed to fetch cryptocurrency data. Please try again.');
       setLoading(false);
     }
+  };
+
+  const fetchPriceHistory = async (timeframe: string) => {
+    setHistoryLoading(true);
+    try {
+      // Convert timeframe to days for CoinGecko API
+      let days = '7';
+      let interval = 'daily';
+      
+      const timeframeObj = timeframes.find(tf => tf.value === timeframe);
+      if (timeframeObj) {
+        const totalDays = timeframeObj.seconds / 86400; // Convert seconds to days
+        if (totalDays <= 1) {
+          days = '1';
+          interval = 'hourly';
+        } else if (totalDays <= 7) {
+          days = Math.ceil(totalDays).toString();
+          interval = 'hourly';
+        } else if (totalDays <= 30) {
+          days = Math.ceil(totalDays).toString();
+          interval = 'daily';
+        } else if (totalDays <= 365) {
+          days = Math.ceil(totalDays).toString();
+          interval = 'daily';
+        } else {
+          days = 'max';
+          interval = 'daily';
+        }
+      }
+
+      const response = await fetch(
+        `https://api.coingecko.com/api/v3/coins/${cryptoId}/market_chart?vs_currency=usd&days=${days}&interval=${interval}`
+      );
+      const data = await response.json();
+
+      if (data.prices) {
+        const historyData: PriceHistoryPoint[] = data.prices.map((price: [number, number], index: number) => {
+          const timestamp = price[0];
+          const priceValue = price[1];
+          const volume = data.total_volumes?.[index]?.[1] || 0;
+          const marketCap = data.market_caps?.[index]?.[1] || 0;
+          const date = new Date(timestamp);
+
+          return {
+            timestamp,
+            price: priceValue,
+            volume,
+            market_cap: marketCap,
+            date: date.toLocaleDateString(),
+            time: date.toLocaleTimeString(),
+          };
+        });
+
+        setPriceHistory(historyData);
+        
+        // Calculate technical indicators (simplified)
+        if (historyData.length > 20) {
+          const prices = historyData.map(point => point.price);
+          const sma20 = calculateSMA(prices, 20);
+          const sma50 = calculateSMA(prices, 50);
+          const rsi = calculateRSI(prices, 14);
+          
+          setTechnicalIndicators({
+            sma_20: sma20,
+            sma_50: sma50,
+            rsi: rsi,
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching price history:', error);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const calculateSMA = (prices: number[], period: number): number => {
+    if (prices.length < period) return 0;
+    const sum = prices.slice(-period).reduce((acc, price) => acc + price, 0);
+    return sum / period;
+  };
+
+  const calculateRSI = (prices: number[], period: number): number => {
+    if (prices.length < period) return 50;
+    
+    let gains = 0;
+    let losses = 0;
+    
+    for (let i = prices.length - period; i < prices.length; i++) {
+      const change = prices[i] - prices[i - 1];
+      if (change > 0) gains += change;
+      else losses -= change;
+    }
+    
+    const avgGain = gains / period;
+    const avgLoss = losses / period;
+    const rs = avgGain / avgLoss;
+    return 100 - (100 / (1 + rs));
+  };
+
+  const handleWatchlistToggle = () => {
+    if (!cryptoData) return;
+    
+    if (isInWatchlist(cryptoData.id)) {
+      removeFromWatchlist(cryptoData.id);
+    } else {
+      addToWatchlist({
+        id: cryptoData.id,
+        symbol: cryptoData.symbol,
+        name: cryptoData.name,
+        image: cryptoData.image,
+      });
+    }
+  };
+
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      // You could add a toast notification here
+    } catch (error) {
+      console.error('Failed to copy link:', error);
+    }
+  };
+
+  const handleShareExternal = () => {
+    const url = `https://coingecko.com/en/coins/${cryptoId}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   const generateAIPredictions = (data: CryptoDetailData) => {
@@ -233,7 +391,12 @@ const CryptoDetailView: React.FC<CryptoDetailViewProps> = ({ cryptoId, onBack })
 
   useEffect(() => {
     fetchCryptoData();
+    fetchPriceHistory(historyTimeframe);
   }, [cryptoId]);
+
+  useEffect(() => {
+    fetchPriceHistory(historyTimeframe);
+  }, [historyTimeframe, cryptoId]);
 
   useEffect(() => {
     const selectedTimeframe = timeframes.find(tf => tf.value === updateInterval);
@@ -296,6 +459,20 @@ const CryptoDetailView: React.FC<CryptoDetailViewProps> = ({ cryptoId, onBack })
     );
   }
 
+  if (!cryptoData && error) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-red-500 mb-4">⚠️ {error}</div>
+          <Button onClick={onBack} variant="outline">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to List
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   if (!cryptoData) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -310,16 +487,16 @@ const CryptoDetailView: React.FC<CryptoDetailViewProps> = ({ cryptoId, onBack })
     <div className="min-h-screen bg-background p-4 md:p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header with Back Button */}
-        <div className="flex items-center gap-4 mb-8">
+        <div className="flex flex-col md:flex-row items-start md:items-center gap-4 mb-8">
           <Button onClick={onBack} variant="outline" size="sm">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to List
           </Button>
           
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 flex-1">
             <img src={cryptoData.image} alt={cryptoData.name} className="w-16 h-16" />
-            <div>
-              <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-primary to-crypto-purple bg-clip-text text-transparent">
+            <div className="flex-1">
+              <h1 className="text-3xl md:text-5xl font-bold bg-gradient-to-r from-primary to-crypto-purple bg-clip-text text-transparent">
                 {cryptoData.name} ({cryptoData.symbol.toUpperCase()})
               </h1>
               <p className="text-muted-foreground">
@@ -328,7 +505,27 @@ const CryptoDetailView: React.FC<CryptoDetailViewProps> = ({ cryptoId, onBack })
             </div>
           </div>
           
-          <div className="ml-auto">
+          <div className="flex items-center gap-2">
+            {/* Watchlist Button */}
+            <Button
+              onClick={handleWatchlistToggle}
+              variant={isInWatchlist(cryptoData.id) ? "default" : "outline"}
+              size="sm"
+            >
+              <Star className={`w-4 h-4 mr-2 ${isInWatchlist(cryptoData.id) ? 'fill-current' : ''}`} />
+              {isInWatchlist(cryptoData.id) ? 'In Watchlist' : 'Add to Watchlist'}
+            </Button>
+            
+            {/* Share Buttons */}
+            <Button onClick={handleCopyLink} variant="outline" size="sm">
+              <Copy className="w-4 h-4" />
+            </Button>
+            
+            <Button onClick={handleShareExternal} variant="outline" size="sm">
+              <ExternalLink className="w-4 h-4" />
+            </Button>
+            
+            {/* Update Frequency */}
             <Select value={updateInterval} onValueChange={setUpdateInterval}>
               <SelectTrigger className="w-48">
                 <SelectValue placeholder="Update frequency" />
@@ -411,12 +608,161 @@ const CryptoDetailView: React.FC<CryptoDetailViewProps> = ({ cryptoId, onBack })
           </Card>
         </div>
 
+        {/* Price Chart */}
+        <Card className="animate-fade-in">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <LineChart className="w-5 h-5" />
+                Price Chart
+              </CardTitle>
+              <div className="flex items-center gap-2">
+                <Select value={chartType} onValueChange={(value: 'line' | 'area' | 'candlestick') => setChartType(value)}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="area">Area</SelectItem>
+                    <SelectItem value="line">Line</SelectItem>
+                    <SelectItem value="candlestick">Candlestick</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant={showVolume ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setShowVolume(!showVolume)}
+                >
+                  <Volume2 className="w-4 h-4 mr-1" />
+                  Volume
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="h-96 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                {chartType === 'area' ? (
+                  <ComposedChart data={priceHistory.slice(-100)}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis 
+                      dataKey="date" 
+                      stroke="hsl(var(--muted-foreground))"
+                      fontSize={12}
+                    />
+                    <YAxis 
+                      yAxisId="price"
+                      stroke="hsl(var(--muted-foreground))"
+                      fontSize={12}
+                      tickFormatter={(value) => `$${value.toFixed(2)}`}
+                    />
+                    {showVolume && (
+                      <YAxis 
+                        yAxisId="volume"
+                        orientation="right"
+                        stroke="hsl(var(--muted-foreground))"
+                        fontSize={12}
+                        tickFormatter={(value) => `${(value / 1e6).toFixed(0)}M`}
+                      />
+                    )}
+                    <Tooltip 
+                      contentStyle={{
+                        backgroundColor: 'hsl(var(--card))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '8px',
+                        color: 'hsl(var(--foreground))'
+                      }}
+                      formatter={(value: any, name: string) => {
+                        if (name === 'price') return [`$${Number(value).toFixed(4)}`, 'Price'];
+                        if (name === 'volume') return [`$${(Number(value) / 1e6).toFixed(2)}M`, 'Volume'];
+                        return [value, name];
+                      }}
+                    />
+                    <Area
+                      yAxisId="price"
+                      type="monotone"
+                      dataKey="price"
+                      stroke="hsl(var(--primary))"
+                      fill="hsl(var(--primary))"
+                      fillOpacity={0.3}
+                      strokeWidth={2}
+                    />
+                    {showVolume && (
+                      <Bar
+                        yAxisId="volume"
+                        dataKey="volume"
+                        fill="hsl(var(--muted))"
+                        opacity={0.3}
+                      />
+                    )}
+                  </ComposedChart>
+                ) : (
+                  <RechartsLineChart data={priceHistory.slice(-100)}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis 
+                      dataKey="date" 
+                      stroke="hsl(var(--muted-foreground))"
+                      fontSize={12}
+                    />
+                    <YAxis 
+                      stroke="hsl(var(--muted-foreground))"
+                      fontSize={12}
+                      tickFormatter={(value) => `$${value.toFixed(2)}`}
+                    />
+                    <Tooltip 
+                      contentStyle={{
+                        backgroundColor: 'hsl(var(--card))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '8px',
+                        color: 'hsl(var(--foreground))'
+                      }}
+                      formatter={(value: any) => [`$${Number(value).toFixed(4)}`, 'Price']}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="price"
+                      stroke="hsl(var(--primary))"
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                    {technicalIndicators.sma_20 && (
+                      <Line
+                        type="monotone"
+                        dataKey={() => technicalIndicators.sma_20}
+                        stroke="hsl(var(--crypto-orange))"
+                        strokeWidth={1}
+                        strokeDasharray="5 5"
+                        dot={false}
+                      />
+                    )}
+                  </RechartsLineChart>
+                )}
+              </ResponsiveContainer>
+            </div>
+            {technicalIndicators.rsi && (
+              <div className="mt-4 p-4 bg-muted/50 rounded-lg">
+                <div className="flex items-center justify-between text-sm">
+                  <span>Technical Indicators:</span>
+                  <div className="flex gap-4">
+                    {technicalIndicators.sma_20 && (
+                      <span>SMA(20): <span className="font-mono">${technicalIndicators.sma_20.toFixed(2)}</span></span>
+                    )}
+                    {technicalIndicators.rsi && (
+                      <span>RSI(14): <span className={`font-mono ${technicalIndicators.rsi > 70 ? 'text-crypto-red' : technicalIndicators.rsi < 30 ? 'text-crypto-green' : 'text-foreground'}`}>{technicalIndicators.rsi.toFixed(1)}</span></span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Detailed Information Tabs */}
         <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="supply">Supply Info</TabsTrigger>
             <TabsTrigger value="performance">Performance</TabsTrigger>
+            <TabsTrigger value="price-history">Price History</TabsTrigger>
             <TabsTrigger value="ai-predictions">AI Predictions</TabsTrigger>
           </TabsList>
           
@@ -597,6 +943,192 @@ const CryptoDetailView: React.FC<CryptoDetailViewProps> = ({ cryptoId, onBack })
                     Past performance doesn't indicate future results. Only invest what you can afford to lose.
                   </AlertDescription>
                 </Alert>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="price-history" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <Activity className="w-5 h-5" />
+                    Price History & Analysis
+                  </CardTitle>
+                  <Select value={historyTimeframe} onValueChange={setHistoryTimeframe}>
+                    <SelectTrigger className="w-48">
+                      <SelectValue placeholder="Select timeframe" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-60">
+                      <div className="px-2 py-1 text-xs font-semibold text-muted-foreground">Seconds</div>
+                      {timeframes.filter(tf => tf.value.endsWith('s')).map((timeframe) => (
+                        <SelectItem key={timeframe.value} value={timeframe.value}>
+                          {timeframe.label}
+                        </SelectItem>
+                      ))}
+                      <div className="px-2 py-1 text-xs font-semibold text-muted-foreground">Minutes</div>
+                      {timeframes.filter(tf => tf.value.endsWith('m')).map((timeframe) => (
+                        <SelectItem key={timeframe.value} value={timeframe.value}>
+                          {timeframe.label}
+                        </SelectItem>
+                      ))}
+                      <div className="px-2 py-1 text-xs font-semibold text-muted-foreground">Hours</div>
+                      {timeframes.filter(tf => tf.value.endsWith('h')).map((timeframe) => (
+                        <SelectItem key={timeframe.value} value={timeframe.value}>
+                          {timeframe.label}
+                        </SelectItem>
+                      ))}
+                      <div className="px-2 py-1 text-xs font-semibold text-muted-foreground">Days</div>
+                      {timeframes.filter(tf => tf.value.endsWith('d')).map((timeframe) => (
+                        <SelectItem key={timeframe.value} value={timeframe.value}>
+                          {timeframe.label}
+                        </SelectItem>
+                      ))}
+                      <div className="px-2 py-1 text-xs font-semibold text-muted-foreground">Months & Years</div>
+                      {timeframes.filter(tf => tf.value.endsWith('M') || tf.value.endsWith('Y') || tf.value === 'max').map((timeframe) => (
+                        <SelectItem key={timeframe.value} value={timeframe.value}>
+                          {timeframe.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {historyLoading ? (
+                  <div className="flex items-center justify-center h-64">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                    <span className="ml-2">Loading price history...</span>
+                  </div>
+                ) : priceHistory.length > 0 ? (
+                  <div className="space-y-6">
+                    {/* Enhanced Chart */}
+                    <div className="h-80 w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <ComposedChart data={priceHistory}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                          <XAxis 
+                            dataKey="date" 
+                            stroke="hsl(var(--muted-foreground))"
+                            fontSize={12}
+                            interval="preserveStartEnd"
+                          />
+                          <YAxis 
+                            yAxisId="price"
+                            stroke="hsl(var(--muted-foreground))"
+                            fontSize={12}
+                            tickFormatter={(value) => `$${value < 1 ? value.toFixed(6) : value.toFixed(2)}`}
+                          />
+                          <YAxis 
+                            yAxisId="volume"
+                            orientation="right"
+                            stroke="hsl(var(--muted-foreground))"
+                            fontSize={12}
+                            tickFormatter={(value) => `${(value / 1e6).toFixed(0)}M`}
+                          />
+                          <Tooltip 
+                            contentStyle={{
+                              backgroundColor: 'hsl(var(--card))',
+                              border: '1px solid hsl(var(--border))',
+                              borderRadius: '8px',
+                              color: 'hsl(var(--foreground))'
+                            }}
+                            formatter={(value: any, name: string) => {
+                              if (name === 'price') return [`$${Number(value).toFixed(6)}`, 'Price'];
+                              if (name === 'volume') return [`$${(Number(value) / 1e6).toFixed(2)}M`, 'Volume'];
+                              if (name === 'market_cap') return [`$${(Number(value) / 1e9).toFixed(2)}B`, 'Market Cap'];
+                              return [value, name];
+                            }}
+                            labelFormatter={(label) => `Date: ${label}`}
+                          />
+                          <Area
+                            yAxisId="price"
+                            type="monotone"
+                            dataKey="price"
+                            stroke="hsl(var(--primary))"
+                            fill="hsl(var(--primary))"
+                            fillOpacity={0.2}
+                            strokeWidth={2}
+                          />
+                          <Bar
+                            yAxisId="volume"
+                            dataKey="volume"
+                            fill="hsl(var(--crypto-blue))"
+                            opacity={0.3}
+                          />
+                        </ComposedChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    {/* Price Statistics */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="p-4 border rounded-lg text-center">
+                        <div className="text-sm text-muted-foreground">Highest</div>
+                        <div className="text-lg font-bold text-crypto-green">
+                          ${Math.max(...priceHistory.map(p => p.price)).toFixed(4)}
+                        </div>
+                      </div>
+                      <div className="p-4 border rounded-lg text-center">
+                        <div className="text-sm text-muted-foreground">Lowest</div>
+                        <div className="text-lg font-bold text-crypto-red">
+                          ${Math.min(...priceHistory.map(p => p.price)).toFixed(4)}
+                        </div>
+                      </div>
+                      <div className="p-4 border rounded-lg text-center">
+                        <div className="text-sm text-muted-foreground">Average</div>
+                        <div className="text-lg font-bold text-crypto-blue">
+                          ${(priceHistory.reduce((acc, p) => acc + p.price, 0) / priceHistory.length).toFixed(4)}
+                        </div>
+                      </div>
+                      <div className="p-4 border rounded-lg text-center">
+                        <div className="text-sm text-muted-foreground">Volatility</div>
+                        <div className="text-lg font-bold text-crypto-purple">
+                          {(((Math.max(...priceHistory.map(p => p.price)) - Math.min(...priceHistory.map(p => p.price))) / Math.min(...priceHistory.map(p => p.price))) * 100).toFixed(2)}%
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Technical Analysis */}
+                    {technicalIndicators.rsi && (
+                      <div className="p-4 border rounded-lg">
+                        <h4 className="font-semibold mb-3 flex items-center gap-2">
+                          <BarChart3 className="w-4 h-4" />
+                          Technical Analysis
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          {technicalIndicators.sma_20 && (
+                            <div>
+                              <div className="text-sm text-muted-foreground">SMA (20)</div>
+                              <div className="font-mono text-crypto-orange">${technicalIndicators.sma_20.toFixed(4)}</div>
+                            </div>
+                          )}
+                          {technicalIndicators.sma_50 && (
+                            <div>
+                              <div className="text-sm text-muted-foreground">SMA (50)</div>
+                              <div className="font-mono text-crypto-blue">${technicalIndicators.sma_50.toFixed(4)}</div>
+                            </div>
+                          )}
+                          <div>
+                            <div className="text-sm text-muted-foreground">RSI (14)</div>
+                            <div className={`font-mono ${technicalIndicators.rsi > 70 ? 'text-crypto-red' : technicalIndicators.rsi < 30 ? 'text-crypto-green' : 'text-foreground'}`}>
+                              {technicalIndicators.rsi.toFixed(1)}
+                              <span className="text-xs ml-1">
+                                {technicalIndicators.rsi > 70 ? '(Overbought)' : technicalIndicators.rsi < 30 ? '(Oversold)' : '(Neutral)'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center h-64">
+                    <div className="text-center text-muted-foreground">
+                      <Activity className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                      <p>No price history data available for this timeframe</p>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
