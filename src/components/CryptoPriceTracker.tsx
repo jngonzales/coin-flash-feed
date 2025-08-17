@@ -3,6 +3,7 @@ import { Search, TrendingUp, TrendingDown } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { allCryptos, searchCryptos } from '@/data/cryptoData';
 
 interface CryptoData {
   id: string;
@@ -25,35 +26,38 @@ const CryptoPriceTracker: React.FC<CryptoPriceTrackerProps> = ({ onCryptoClick }
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
 
-  const fetchCryptoData = async () => {
+  const loadCryptoData = () => {
     try {
-      const response = await fetch(
-        'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=250&page=1&sparkline=false&price_change_percentage=24h'
-      );
-      const data = await response.json();
-      setCryptos(data);
-      setFilteredCryptos(data);
+      // Add some price simulation for realism
+      const simulatedCryptos = allCryptos.map(crypto => ({
+        ...crypto,
+        current_price: crypto.current_price * (1 + (Math.random() - 0.5) * 0.02), // ±1% variation
+        price_change_percentage_24h: crypto.price_change_percentage_24h + (Math.random() - 0.5) * 2, // ±1% variation
+      }));
+      
+      setCryptos(simulatedCryptos);
+      setFilteredCryptos(simulatedCryptos);
       setLastUpdate(new Date());
       setLoading(false);
     } catch (error) {
-      console.error('Error fetching crypto data:', error);
+      console.error('Error loading crypto data:', error);
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchCryptoData();
-    const interval = setInterval(fetchCryptoData, 10000); // Update every 10 seconds
+    loadCryptoData();
+    const interval = setInterval(loadCryptoData, 10000); // Update every 10 seconds
     return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
-    const filtered = cryptos.filter(
-      (crypto) =>
-        crypto.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        crypto.symbol.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-    setFilteredCryptos(filtered);
+    if (searchTerm.trim() === '') {
+      setFilteredCryptos(cryptos);
+    } else {
+      const filtered = searchCryptos(searchTerm);
+      setFilteredCryptos(filtered);
+    }
   }, [searchTerm, cryptos]);
 
   const formatPrice = (price: number) => {

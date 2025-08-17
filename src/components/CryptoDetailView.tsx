@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { TrendingUp, TrendingDown, Info, DollarSign, BarChart3, Clock, Zap, Shield, ArrowLeft, Brain, Calendar, Target, LineChart, Activity, TrendingDownIcon, Volume2, Maximize2, Star, Bell, Copy, ExternalLink } from 'lucide-react';
+import { TrendingUp, TrendingDown, Info, DollarSign, BarChart3, Clock, Zap, Shield, ArrowLeft, Brain, Calendar, Target, LineChart, Activity, Volume2, Star, Copy, ExternalLink, BarChart2 } from 'lucide-react';
 import { useWatchlist } from '@/hooks/useWatchlist';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -9,38 +9,11 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { LineChart as RechartsLineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart, BarChart, Bar, ComposedChart } from 'recharts';
+import { getCryptoById, generatePriceHistory, PricePoint, CryptoInfo } from '@/data/cryptoData';
+import TradingViewChart from './TradingViewChart';
 
-interface CryptoDetailData {
-  id: string;
-  symbol: string;
-  name: string;
-  current_price: number;
-  price_change_percentage_24h: number;
-  price_change_percentage_7d: number;
-  price_change_percentage_30d: number;
-  market_cap: number;
-  market_cap_rank: number;
-  total_volume: number;
-  high_24h: number;
-  low_24h: number;
-  ath: number;
-  ath_change_percentage: number;
-  circulating_supply: number;
-  max_supply: number;
-  total_supply: number;
-  image: string;
-  description?: string;
-  genesis_date?: string;
-}
-
-interface PriceHistoryPoint {
-  timestamp: number;
-  price: number;
-  volume?: number;
-  market_cap?: number;
-  date: string;
-  time: string;
-}
+// Using CryptoInfo from data/cryptoData.ts
+// Using PricePoint from data/cryptoData.ts
 
 interface TechnicalIndicators {
   sma_20?: number;
@@ -177,245 +150,92 @@ interface CryptoDetailViewProps {
 }
 
 const CryptoDetailView: React.FC<CryptoDetailViewProps> = ({ cryptoId, onBack }) => {
-  const [cryptoData, setCryptoData] = useState<CryptoDetailData | null>(null);
+  const [cryptoData, setCryptoData] = useState<CryptoInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [updateInterval, setUpdateInterval] = useState<string>('30s');
   const [aiPredictions, setAiPredictions] = useState<AIPrediction | null>(null);
-  const [priceHistory, setPriceHistory] = useState<PriceHistoryPoint[]>([]);
-  const [historyTimeframe, setHistoryTimeframe] = useState<string>('7d');
-  const [chartType, setChartType] = useState<'line' | 'area' | 'candlestick'>('area');
+  const [priceHistory, setPriceHistory] = useState<PricePoint[]>([]);
+  const [historyTimeframe, setHistoryTimeframe] = useState<string>('1d');
+  const [mainChartTimeframe, setMainChartTimeframe] = useState<string>('1h');
+  const [chartType, setChartType] = useState<'line' | 'area' | 'candlestick'>('candlestick');
   const [showVolume, setShowVolume] = useState(true);
   const [technicalIndicators, setTechnicalIndicators] = useState<TechnicalIndicators>({});
   const [historyLoading, setHistoryLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [usingFallbackData, setUsingFallbackData] = useState(false);
   
   const { addToWatchlist, removeFromWatchlist, isInWatchlist } = useWatchlist();
 
-  const fetchCryptoData = async () => {
+  const loadCryptoData = () => {
     try {
-      const response = await fetch(
-        `https://api.coingecko.com/api/v3/coins/${cryptoId}?localization=false&tickers=false&market_data=true&community_data=false&developer_data=false&sparkline=true`
-      );
-      
-      if (!response.ok) {
-        throw new Error(`API Error: ${response.status} - ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      
-      const formattedData: CryptoDetailData = {
-        id: data.id,
-        symbol: data.symbol,
-        name: data.name,
-        current_price: data.market_data.current_price.usd,
-        price_change_percentage_24h: data.market_data.price_change_percentage_24h,
-        price_change_percentage_7d: data.market_data.price_change_percentage_7d,
-        price_change_percentage_30d: data.market_data.price_change_percentage_30d,
-        market_cap: data.market_data.market_cap.usd,
-        market_cap_rank: data.market_cap_rank,
-        total_volume: data.market_data.total_volume.usd,
-        high_24h: data.market_data.high_24h.usd,
-        low_24h: data.market_data.low_24h.usd,
-        ath: data.market_data.ath.usd,
-        ath_change_percentage: data.market_data.ath_change_percentage.usd,
-        circulating_supply: data.market_data.circulating_supply,
-        max_supply: data.market_data.max_supply,
-        total_supply: data.market_data.total_supply,
-        image: data.image.large,
-        description: data.description?.en?.substring(0, 500) + '...',
-        genesis_date: data.genesis_date,
-      };
-
-      setCryptoData(formattedData);
-      setLastUpdate(new Date());
-      setLoading(false);
+      setLoading(true);
       setError(null);
       
-      // Generate AI predictions (simulated for demo)
-      generateAIPredictions(formattedData);
+      const data = getCryptoById(cryptoId);
+      if (!data) {
+        throw new Error('Cryptocurrency not found');
+      }
+
+      // Add some realistic price simulation
+      const priceVariation = (Math.random() - 0.5) * 0.02; // ±1% variation
+      const updatedData = {
+        ...data,
+        current_price: data.current_price * (1 + priceVariation),
+        high_24h: data.high_24h * (1 + Math.abs(priceVariation)),
+        low_24h: data.low_24h * (1 - Math.abs(priceVariation)),
+      };
+
+      setCryptoData(updatedData);
+      setLastUpdate(new Date());
+      setLoading(false);
+      
+      // Generate AI predictions
+      generateAIPredictions(updatedData);
+      
+      // Load initial price history
+      loadPriceHistory(mainChartTimeframe);
     } catch (error) {
-      console.error('Error fetching crypto data:', error);
-      setError('Failed to fetch cryptocurrency data. Please try again.');
+      console.error('Error loading crypto data:', error);
+      setError('Cryptocurrency not found. Please try again.');
       setLoading(false);
     }
   };
 
-  const fetchPriceHistory = async (timeframe: string) => {
+  const loadPriceHistory = (timeframe: string) => {
+    if (!cryptoData) return;
+    
     setHistoryLoading(true);
     try {
-      // First, try to use sparkline data from the main API call as fallback
-      if (cryptoData && priceHistory.length === 0) {
-        // Generate synthetic price history based on current price and volatility
-        const generateSyntheticHistory = (currentPrice: number, change24h: number, points: number) => {
-          const history: PriceHistoryPoint[] = [];
-          const volatility = Math.abs(change24h) / 100;
-          const now = Date.now();
-          const timeStep = (24 * 60 * 60 * 1000) / points; // 24 hours divided by points
-          
-          for (let i = 0; i < points; i++) {
-            const timestamp = now - (points - i) * timeStep;
-            const randomChange = (Math.random() - 0.5) * volatility * 0.1;
-            const basePrice = currentPrice * (1 - (change24h / 100) * (i / points));
-            const price = basePrice * (1 + randomChange);
-            const date = new Date(timestamp);
-            
-            history.push({
-              timestamp,
-              price: Math.max(0, price),
-              volume: Math.random() * 1000000000, // Random volume for demo
-              market_cap: price * (cryptoData.circulating_supply || 0),
-              date: date.toLocaleDateString(),
-              time: date.toLocaleTimeString(),
-            });
-          }
-          return history;
-        };
-
-        const timeframeObj = timeframes.find(tf => tf.value === timeframe);
-        let points = 24; // Default 24 points
-        
-        if (timeframeObj) {
-          const totalHours = timeframeObj.seconds / 3600;
-          if (totalHours <= 1) points = 12;
-          else if (totalHours <= 24) points = 24;
-          else if (totalHours <= 168) points = 48; // 1 week
-          else if (totalHours <= 720) points = 30; // 1 month
-          else points = 52; // 1 year
-        }
-
-        const syntheticHistory = generateSyntheticHistory(
-          cryptoData.current_price,
-          cryptoData.price_change_percentage_24h,
-          points
-        );
-        
-        setPriceHistory(syntheticHistory);
-        setUsingFallbackData(true);
-        
-        // Calculate technical indicators
-        if (syntheticHistory.length > 20) {
-          const prices = syntheticHistory.map(point => point.price);
-          const sma20 = calculateSMA(prices, 20);
-          const sma50 = calculateSMA(prices, 50);
-          const rsi = calculateRSI(prices, 14);
-          
-          setTechnicalIndicators({
-            sma_20: sma20,
-            sma_50: sma50,
-            rsi: rsi,
-          });
-        }
-        
-        setHistoryLoading(false);
-        return;
-      }
-
-      // Try to fetch from CoinGecko API (may fail due to rate limits)
-      let days = '1';
       const timeframeObj = timeframes.find(tf => tf.value === timeframe);
+      let points = 100;
+      
       if (timeframeObj) {
-        const totalDays = timeframeObj.seconds / 86400;
-        if (totalDays <= 1) days = '1';
-        else if (totalDays <= 7) days = '7';
-        else if (totalDays <= 30) days = '30';
-        else if (totalDays <= 365) days = '365';
-        else days = 'max';
-      }
-
-      // Try the public API endpoint first (without interval parameter which requires auth)
-      let apiUrl = `https://api.coingecko.com/api/v3/coins/${cryptoId}/market_chart?vs_currency=usd&days=${days}`;
-      
-      const response = await fetch(apiUrl);
-      
-      if (!response.ok) {
-        throw new Error(`API Error: ${response.status}`);
+        const totalHours = timeframeObj.seconds / 3600;
+        if (totalHours <= 1) points = 60; // 1 minute intervals
+        else if (totalHours <= 24) points = 96; // 15 minute intervals
+        else if (totalHours <= 168) points = 168; // 1 hour intervals
+        else if (totalHours <= 720) points = 120; // 6 hour intervals
+        else points = 100; // Daily intervals
       }
       
-      const data = await response.json();
-
-      if (data.prices && data.prices.length > 0) {
-        const historyData: PriceHistoryPoint[] = data.prices.map((price: [number, number], index: number) => {
-          const timestamp = price[0];
-          const priceValue = price[1];
-          const volume = data.total_volumes?.[index]?.[1] || 0;
-          const marketCap = data.market_caps?.[index]?.[1] || 0;
-          const date = new Date(timestamp);
-
-          return {
-            timestamp,
-            price: priceValue,
-            volume,
-            market_cap: marketCap,
-            date: date.toLocaleDateString(),
-            time: date.toLocaleTimeString(),
-          };
-        });
-
-        setPriceHistory(historyData);
-        setUsingFallbackData(false);
-        
-        // Calculate technical indicators
-        if (historyData.length > 20) {
-          const prices = historyData.map(point => point.price);
-          const sma20 = calculateSMA(prices, 20);
-          const sma50 = calculateSMA(prices, 50);
-          const rsi = calculateRSI(prices, 14);
-          
-          setTechnicalIndicators({
-            sma_20: sma20,
-            sma_50: sma50,
-            rsi: rsi,
-          });
-        }
-      } else {
-        throw new Error('No price data available');
-      }
-    } catch (error) {
-      console.error('Error fetching price history:', error);
+      const history = generatePriceHistory(cryptoData, timeframe, points);
+      setPriceHistory(history);
       
-      // Fallback: Generate synthetic data based on current crypto data
-      if (cryptoData) {
-        const generateFallbackHistory = () => {
-          const history: PriceHistoryPoint[] = [];
-          const now = Date.now();
-          const points = 24;
-          const timeStep = (24 * 60 * 60 * 1000) / points;
-          const change = cryptoData.price_change_percentage_24h / 100;
-          
-          for (let i = 0; i < points; i++) {
-            const timestamp = now - (points - i) * timeStep;
-            const progress = i / points;
-            const price = cryptoData.current_price * (1 - change * (1 - progress));
-            const date = new Date(timestamp);
-            
-            history.push({
-              timestamp,
-              price: Math.max(0, price + (Math.random() - 0.5) * price * 0.02),
-              volume: Math.random() * cryptoData.total_volume * 0.1,
-              market_cap: price * (cryptoData.circulating_supply || 0),
-              date: date.toLocaleDateString(),
-              time: date.toLocaleTimeString(),
-            });
-          }
-          return history;
-        };
-
-        const fallbackHistory = generateFallbackHistory();
-        setPriceHistory(fallbackHistory);
-        setUsingFallbackData(true);
-        
-        // Calculate basic technical indicators
-        const prices = fallbackHistory.map(point => point.price);
-        const sma20 = calculateSMA(prices, Math.min(20, prices.length));
-        const rsi = calculateRSI(prices, Math.min(14, prices.length));
+      // Calculate technical indicators
+      if (history.length > 20) {
+        const prices = history.map(point => point.close);
+        const sma20 = calculateSMA(prices, 20);
+        const sma50 = calculateSMA(prices, Math.min(50, prices.length));
+        const rsi = calculateRSI(prices, 14);
         
         setTechnicalIndicators({
           sma_20: sma20,
+          sma_50: sma50,
           rsi: rsi,
         });
       }
+    } catch (error) {
+      console.error('Error generating price history:', error);
     } finally {
       setHistoryLoading(false);
     }
@@ -474,13 +294,13 @@ const CryptoDetailView: React.FC<CryptoDetailViewProps> = ({ cryptoId, onBack })
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
-  const retryFetchData = () => {
+  const retryLoadData = () => {
     setError(null);
     setLoading(true);
-    fetchCryptoData();
+    loadCryptoData();
   };
 
-  const generateAIPredictions = (data: CryptoDetailData) => {
+  const generateAIPredictions = (data: CryptoInfo) => {
     // Simulated AI predictions based on current trends and volatility
     const volatility = Math.abs(data.price_change_percentage_24h) / 100;
     const trend = data.price_change_percentage_24h > 0 ? 'bullish' : 'bearish';
@@ -507,18 +327,19 @@ const CryptoDetailView: React.FC<CryptoDetailViewProps> = ({ cryptoId, onBack })
   };
 
   useEffect(() => {
-    fetchCryptoData();
-    fetchPriceHistory(historyTimeframe);
+    loadCryptoData();
   }, [cryptoId]);
 
   useEffect(() => {
-    fetchPriceHistory(historyTimeframe);
-  }, [historyTimeframe, cryptoId]);
+    if (cryptoData) {
+      loadPriceHistory(historyTimeframe);
+    }
+  }, [historyTimeframe, cryptoData]);
 
   useEffect(() => {
     const selectedTimeframe = timeframes.find(tf => tf.value === updateInterval);
-    if (selectedTimeframe && selectedTimeframe.seconds > 0) {
-      const interval = setInterval(fetchCryptoData, selectedTimeframe.seconds * 1000);
+    if (selectedTimeframe && selectedTimeframe.seconds > 0 && selectedTimeframe.seconds >= 1) {
+      const interval = setInterval(loadCryptoData, Math.max(selectedTimeframe.seconds * 1000, 1000));
       return () => clearInterval(interval);
     }
   }, [updateInterval, cryptoId]);
@@ -582,7 +403,7 @@ const CryptoDetailView: React.FC<CryptoDetailViewProps> = ({ cryptoId, onBack })
         <div className="text-center space-y-4">
           <div className="text-red-500 mb-4">⚠️ {error}</div>
           <div className="flex gap-2 justify-center">
-            <Button onClick={retryFetchData} variant="default">
+            <Button onClick={retryLoadData} variant="default">
               Try Again
             </Button>
             <Button onClick={onBack} variant="outline">
@@ -663,19 +484,10 @@ const CryptoDetailView: React.FC<CryptoDetailViewProps> = ({ cryptoId, onBack })
           </div>
         </div>
 
-        <div className="text-center space-y-2">
+        <div className="text-center">
           <p className="text-sm text-muted-foreground">
             Last updated: {lastUpdate.toLocaleTimeString()} • Updates every {timeframes.find(tf => tf.value === updateInterval)?.label}
           </p>
-          {usingFallbackData && (
-            <Alert className="max-w-2xl mx-auto">
-              <Info className="h-4 w-4" />
-              <AlertDescription>
-                <strong>Demo Mode:</strong> Using simulated price history data due to API limitations. 
-                Real-time current prices are still accurate.
-              </AlertDescription>
-            </Alert>
-          )}
         </div>
 
         {/* Main Price Card */}
@@ -741,23 +553,36 @@ const CryptoDetailView: React.FC<CryptoDetailViewProps> = ({ cryptoId, onBack })
           </Card>
         </div>
 
-        {/* Price Chart */}
+        {/* Main Price Chart */}
         <Card className="animate-fade-in">
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2">
-                <LineChart className="w-5 h-5" />
-                Price Chart
+                <BarChart2 className="w-5 h-5" />
+                Live Price Chart
               </CardTitle>
               <div className="flex items-center gap-2">
+                <Select value={mainChartTimeframe} onValueChange={setMainChartTimeframe}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="5m">5 minutes</SelectItem>
+                    <SelectItem value="15m">15 minutes</SelectItem>
+                    <SelectItem value="1h">1 hour</SelectItem>
+                    <SelectItem value="4h">4 hours</SelectItem>
+                    <SelectItem value="1d">1 day</SelectItem>
+                    <SelectItem value="1w">1 week</SelectItem>
+                  </SelectContent>
+                </Select>
                 <Select value={chartType} onValueChange={(value: 'line' | 'area' | 'candlestick') => setChartType(value)}>
                   <SelectTrigger className="w-32">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="candlestick">Candlestick</SelectItem>
                     <SelectItem value="area">Area</SelectItem>
                     <SelectItem value="line">Line</SelectItem>
-                    <SelectItem value="candlestick">Candlestick</SelectItem>
                   </SelectContent>
                 </Select>
                 <Button
@@ -772,105 +597,114 @@ const CryptoDetailView: React.FC<CryptoDetailViewProps> = ({ cryptoId, onBack })
             </div>
           </CardHeader>
           <CardContent>
-            <div className="h-96 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                {chartType === 'area' ? (
-                  <ComposedChart data={priceHistory.slice(-100)}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis 
-                      dataKey="date" 
-                      stroke="hsl(var(--muted-foreground))"
-                      fontSize={12}
-                    />
-                    <YAxis 
-                      yAxisId="price"
-                      stroke="hsl(var(--muted-foreground))"
-                      fontSize={12}
-                      tickFormatter={(value) => `$${value.toFixed(2)}`}
-                    />
-                    {showVolume && (
-                      <YAxis 
-                        yAxisId="volume"
-                        orientation="right"
+            {chartType === 'candlestick' ? (
+              <TradingViewChart 
+                data={generatePriceHistory(cryptoData, mainChartTimeframe, 100)} 
+                showVolume={showVolume}
+                height={400}
+              />
+            ) : (
+              <div className="h-96 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  {chartType === 'area' ? (
+                    <ComposedChart data={priceHistory.slice(-100)}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis 
+                        dataKey="date" 
                         stroke="hsl(var(--muted-foreground))"
                         fontSize={12}
-                        tickFormatter={(value) => `${(value / 1e6).toFixed(0)}M`}
                       />
-                    )}
-                    <Tooltip 
-                      contentStyle={{
-                        backgroundColor: 'hsl(var(--card))',
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '8px',
-                        color: 'hsl(var(--foreground))'
-                      }}
-                      formatter={(value: any, name: string) => {
-                        if (name === 'price') return [`$${Number(value).toFixed(4)}`, 'Price'];
-                        if (name === 'volume') return [`$${(Number(value) / 1e6).toFixed(2)}M`, 'Volume'];
-                        return [value, name];
-                      }}
-                    />
-                    <Area
-                      yAxisId="price"
-                      type="monotone"
-                      dataKey="price"
-                      stroke="hsl(var(--primary))"
-                      fill="hsl(var(--primary))"
-                      fillOpacity={0.3}
-                      strokeWidth={2}
-                    />
-                    {showVolume && (
-                      <Bar
-                        yAxisId="volume"
-                        dataKey="volume"
-                        fill="hsl(var(--muted))"
-                        opacity={0.3}
+                      <YAxis 
+                        yAxisId="price"
+                        stroke="hsl(var(--muted-foreground))"
+                        fontSize={12}
+                        tickFormatter={(value) => `$${value.toFixed(2)}`}
                       />
-                    )}
-                  </ComposedChart>
-                ) : (
-                  <RechartsLineChart data={priceHistory.slice(-100)}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis 
-                      dataKey="date" 
-                      stroke="hsl(var(--muted-foreground))"
-                      fontSize={12}
-                    />
-                    <YAxis 
-                      stroke="hsl(var(--muted-foreground))"
-                      fontSize={12}
-                      tickFormatter={(value) => `$${value.toFixed(2)}`}
-                    />
-                    <Tooltip 
-                      contentStyle={{
-                        backgroundColor: 'hsl(var(--card))',
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '8px',
-                        color: 'hsl(var(--foreground))'
-                      }}
-                      formatter={(value: any) => [`$${Number(value).toFixed(4)}`, 'Price']}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="price"
-                      stroke="hsl(var(--primary))"
-                      strokeWidth={2}
-                      dot={false}
-                    />
-                    {technicalIndicators.sma_20 && (
+                      {showVolume && (
+                        <YAxis 
+                          yAxisId="volume"
+                          orientation="right"
+                          stroke="hsl(var(--muted-foreground))"
+                          fontSize={12}
+                          tickFormatter={(value) => `${(value / 1e6).toFixed(0)}M`}
+                        />
+                      )}
+                      <Tooltip 
+                        contentStyle={{
+                          backgroundColor: 'hsl(var(--card))',
+                          border: '1px solid hsl(var(--border))',
+                          borderRadius: '8px',
+                          color: 'hsl(var(--foreground))'
+                        }}
+                        formatter={(value: any, name: string) => {
+                          if (name === 'close') return [`$${Number(value).toFixed(4)}`, 'Close'];
+                          if (name === 'volume') return [`$${(Number(value) / 1e6).toFixed(2)}M`, 'Volume'];
+                          return [value, name];
+                        }}
+                      />
+                      <Area
+                        yAxisId="price"
+                        type="monotone"
+                        dataKey="close"
+                        stroke="hsl(var(--primary))"
+                        fill="hsl(var(--primary))"
+                        fillOpacity={0.3}
+                        strokeWidth={2}
+                      />
+                      {showVolume && (
+                        <Bar
+                          yAxisId="volume"
+                          dataKey="volume"
+                          fill="hsl(var(--muted))"
+                          opacity={0.3}
+                        />
+                      )}
+                    </ComposedChart>
+                  ) : (
+                    <RechartsLineChart data={priceHistory.slice(-100)}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis 
+                        dataKey="date" 
+                        stroke="hsl(var(--muted-foreground))"
+                        fontSize={12}
+                      />
+                      <YAxis 
+                        stroke="hsl(var(--muted-foreground))"
+                        fontSize={12}
+                        tickFormatter={(value) => `$${value.toFixed(2)}`}
+                      />
+                      <Tooltip 
+                        contentStyle={{
+                          backgroundColor: 'hsl(var(--card))',
+                          border: '1px solid hsl(var(--border))',
+                          borderRadius: '8px',
+                          color: 'hsl(var(--foreground))'
+                        }}
+                        formatter={(value: any) => [`$${Number(value).toFixed(4)}`, 'Price']}
+                      />
                       <Line
                         type="monotone"
-                        dataKey={() => technicalIndicators.sma_20}
-                        stroke="hsl(var(--crypto-orange))"
-                        strokeWidth={1}
-                        strokeDasharray="5 5"
+                        dataKey="close"
+                        stroke="hsl(var(--primary))"
+                        strokeWidth={2}
                         dot={false}
                       />
-                    )}
-                  </RechartsLineChart>
-                )}
-              </ResponsiveContainer>
-            </div>
+                      {technicalIndicators.sma_20 && (
+                        <Line
+                          type="monotone"
+                          dataKey={() => technicalIndicators.sma_20}
+                          stroke="hsl(var(--crypto-orange))"
+                          strokeWidth={1}
+                          strokeDasharray="5 5"
+                          dot={false}
+                        />
+                      )}
+                    </RechartsLineChart>
+                  )}
+                </ResponsiveContainer>
+              </div>
+            )}
+            
             {technicalIndicators.rsi && (
               <div className="mt-4 p-4 bg-muted/50 rounded-lg">
                 <div className="flex items-center justify-between text-sm">
@@ -1133,90 +967,44 @@ const CryptoDetailView: React.FC<CryptoDetailViewProps> = ({ cryptoId, onBack })
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                     <span className="ml-2">Loading price history...</span>
                   </div>
-                ) : priceHistory.length > 0 ? (
+                ) : (
                   <div className="space-y-6">
-                    {/* Enhanced Chart */}
-                    <div className="h-80 w-full">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <ComposedChart data={priceHistory}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                          <XAxis 
-                            dataKey="date" 
-                            stroke="hsl(var(--muted-foreground))"
-                            fontSize={12}
-                            interval="preserveStartEnd"
-                          />
-                          <YAxis 
-                            yAxisId="price"
-                            stroke="hsl(var(--muted-foreground))"
-                            fontSize={12}
-                            tickFormatter={(value) => `$${value < 1 ? value.toFixed(6) : value.toFixed(2)}`}
-                          />
-                          <YAxis 
-                            yAxisId="volume"
-                            orientation="right"
-                            stroke="hsl(var(--muted-foreground))"
-                            fontSize={12}
-                            tickFormatter={(value) => `${(value / 1e6).toFixed(0)}M`}
-                          />
-                          <Tooltip 
-                            contentStyle={{
-                              backgroundColor: 'hsl(var(--card))',
-                              border: '1px solid hsl(var(--border))',
-                              borderRadius: '8px',
-                              color: 'hsl(var(--foreground))'
-                            }}
-                            formatter={(value: any, name: string) => {
-                              if (name === 'price') return [`$${Number(value).toFixed(6)}`, 'Price'];
-                              if (name === 'volume') return [`$${(Number(value) / 1e6).toFixed(2)}M`, 'Volume'];
-                              if (name === 'market_cap') return [`$${(Number(value) / 1e9).toFixed(2)}B`, 'Market Cap'];
-                              return [value, name];
-                            }}
-                            labelFormatter={(label) => `Date: ${label}`}
-                          />
-                          <Area
-                            yAxisId="price"
-                            type="monotone"
-                            dataKey="price"
-                            stroke="hsl(var(--primary))"
-                            fill="hsl(var(--primary))"
-                            fillOpacity={0.2}
-                            strokeWidth={2}
-                          />
-                          <Bar
-                            yAxisId="volume"
-                            dataKey="volume"
-                            fill="hsl(var(--crypto-blue))"
-                            opacity={0.3}
-                          />
-                        </ComposedChart>
-                      </ResponsiveContainer>
-                    </div>
+                    {/* TradingView-Style Chart for Price History */}
+                    <TradingViewChart 
+                      data={generatePriceHistory(cryptoData, historyTimeframe, 200)} 
+                      showVolume={true}
+                      height={500}
+                    />
 
                     {/* Price Statistics */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       <div className="p-4 border rounded-lg text-center">
-                        <div className="text-sm text-muted-foreground">Highest</div>
+                        <div className="text-sm text-muted-foreground">Period High</div>
                         <div className="text-lg font-bold text-crypto-green">
-                          ${Math.max(...priceHistory.map(p => p.price)).toFixed(4)}
+                          ${Math.max(...generatePriceHistory(cryptoData, historyTimeframe, 200).map(p => p.high)).toFixed(4)}
                         </div>
                       </div>
                       <div className="p-4 border rounded-lg text-center">
-                        <div className="text-sm text-muted-foreground">Lowest</div>
+                        <div className="text-sm text-muted-foreground">Period Low</div>
                         <div className="text-lg font-bold text-crypto-red">
-                          ${Math.min(...priceHistory.map(p => p.price)).toFixed(4)}
+                          ${Math.min(...generatePriceHistory(cryptoData, historyTimeframe, 200).map(p => p.low)).toFixed(4)}
                         </div>
                       </div>
                       <div className="p-4 border rounded-lg text-center">
-                        <div className="text-sm text-muted-foreground">Average</div>
+                        <div className="text-sm text-muted-foreground">Average Close</div>
                         <div className="text-lg font-bold text-crypto-blue">
-                          ${(priceHistory.reduce((acc, p) => acc + p.price, 0) / priceHistory.length).toFixed(4)}
+                          ${(generatePriceHistory(cryptoData, historyTimeframe, 200).reduce((acc, p) => acc + p.close, 0) / 200).toFixed(4)}
                         </div>
                       </div>
                       <div className="p-4 border rounded-lg text-center">
                         <div className="text-sm text-muted-foreground">Volatility</div>
                         <div className="text-lg font-bold text-crypto-purple">
-                          {(((Math.max(...priceHistory.map(p => p.price)) - Math.min(...priceHistory.map(p => p.price))) / Math.min(...priceHistory.map(p => p.price))) * 100).toFixed(2)}%
+                          {(() => {
+                            const histData = generatePriceHistory(cryptoData, historyTimeframe, 200);
+                            const high = Math.max(...histData.map(p => p.high));
+                            const low = Math.min(...histData.map(p => p.low));
+                            return (((high - low) / low) * 100).toFixed(2);
+                          })()}%
                         </div>
                       </div>
                     </div>
@@ -1253,13 +1041,6 @@ const CryptoDetailView: React.FC<CryptoDetailViewProps> = ({ cryptoId, onBack })
                         </div>
                       </div>
                     )}
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-center h-64">
-                    <div className="text-center text-muted-foreground">
-                      <Activity className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                      <p>No price history data available for this timeframe</p>
-                    </div>
                   </div>
                 )}
               </CardContent>
