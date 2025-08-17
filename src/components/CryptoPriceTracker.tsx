@@ -24,7 +24,7 @@ const CryptoPriceTracker = () => {
   const fetchCryptoData = async () => {
     try {
       const response = await fetch(
-        'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=50&page=1&sparkline=false&price_change_percentage=24h'
+        'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=250&page=1&sparkline=false&price_change_percentage=24h'
       );
       const data = await response.json();
       setCryptos(data);
@@ -119,35 +119,42 @@ const CryptoPriceTracker = () => {
       {/* Crypto Cards/Table */}
       <div className="container mx-auto px-4 py-6">
         <div className="grid gap-4 md:gap-6">
-          {filteredCryptos.slice(0, 20).map((crypto, index) => (
-            <Card key={crypto.id} className="bg-card border-border hover:bg-accent/50 transition-all duration-200 hover:shadow-crypto">
+          {filteredCryptos.slice(0, 100).map((crypto, index) => (
+            <Card 
+              key={crypto.id} 
+              className="bg-card border-border hover:bg-accent/50 transition-all duration-300 hover:shadow-crypto-hover hover:scale-[1.02] animate-fade-in group cursor-pointer"
+              style={{ animationDelay: `${index * 50}ms` }}
+            >
               <CardContent className="p-4 md:p-6">
                 <div className="flex items-center justify-between gap-4">
                   {/* Rank & Logo */}
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="text-sm font-medium text-muted-foreground">
+                    <div className="text-sm font-medium text-muted-foreground bg-muted px-2 py-1 rounded-full">
                       #{index + 1}
                     </div>
-                    <img
-                      src={crypto.image}
-                      alt={crypto.name}
-                      className="w-8 h-8 rounded-full"
-                    />
+                    <div className="relative">
+                      <img
+                        src={crypto.image}
+                        alt={crypto.name}
+                        className="w-10 h-10 rounded-full transition-transform duration-300 group-hover:scale-110"
+                      />
+                      <div className="absolute inset-0 rounded-full bg-gradient-to-br from-crypto-blue/20 to-crypto-purple/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                    </div>
                     <div className="min-w-0">
-                      <h3 className="font-semibold text-foreground truncate">
+                      <h3 className="font-semibold text-foreground truncate group-hover:text-primary transition-colors duration-200">
                         {crypto.name}
                       </h3>
-                      <p className="text-sm text-muted-foreground uppercase">
+                      <p className="text-sm text-muted-foreground uppercase font-mono">
                         {crypto.symbol}
                       </p>
                     </div>
                   </div>
 
                   {/* Price & Stats */}
-                  <div className="flex items-center gap-6 text-right">
+                  <div className="flex flex-col sm:flex-row items-end sm:items-center gap-3 sm:gap-6 text-right">
                     {/* Price */}
-                    <div>
-                      <div className="text-lg font-bold text-foreground">
+                    <div className="min-w-0">
+                      <div className="text-lg font-bold text-foreground group-hover:text-primary transition-colors duration-200">
                         {formatPrice(crypto.current_price)}
                       </div>
                       <div className="text-sm text-muted-foreground">
@@ -156,19 +163,19 @@ const CryptoPriceTracker = () => {
                     </div>
 
                     {/* 24h Change */}
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-2">
                       {crypto.price_change_percentage_24h > 0 ? (
-                        <TrendingUp className="w-4 h-4 text-crypto-green" />
+                        <TrendingUp className="w-4 h-4 text-crypto-green animate-pulse" />
                       ) : (
-                        <TrendingDown className="w-4 h-4 text-crypto-red" />
+                        <TrendingDown className="w-4 h-4 text-crypto-red animate-pulse" />
                       )}
                       <Badge
                         variant={crypto.price_change_percentage_24h > 0 ? 'default' : 'destructive'}
-                        className={
+                        className={`transition-all duration-300 group-hover:scale-105 ${
                           crypto.price_change_percentage_24h > 0
-                            ? 'bg-crypto-green/10 text-crypto-green border-crypto-green/20'
-                            : 'bg-crypto-red/10 text-crypto-red border-crypto-red/20'
-                        }
+                            ? 'bg-crypto-green/10 text-crypto-green border-crypto-green/20 hover:bg-crypto-green/20'
+                            : 'bg-crypto-red/10 text-crypto-red border-crypto-red/20 hover:bg-crypto-red/20'
+                        }`}
                       >
                         {crypto.price_change_percentage_24h > 0 ? '+' : ''}
                         {crypto.price_change_percentage_24h.toFixed(2)}%
