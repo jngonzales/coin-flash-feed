@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { LineChart as RechartsLineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart, BarChart, Bar, ComposedChart } from 'recharts';
 import { getCryptoById, generatePriceHistory, PricePoint, CryptoInfo } from '@/data/cryptoData';
+import { liveDataFetcher } from '@/services/cryptoWebSocket';
 import TradingViewChart from './TradingViewChart';
 
 // Using CryptoInfo from data/cryptoData.ts
@@ -163,28 +164,35 @@ const CryptoDetailView: React.FC<CryptoDetailViewProps> = ({ cryptoId, onBack })
   const [technicalIndicators, setTechnicalIndicators] = useState<TechnicalIndicators>({});
   const [historyLoading, setHistoryLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isLiveData, setIsLiveData] = useState(false);
   
   const { addToWatchlist, removeFromWatchlist, isInWatchlist } = useWatchlist();
 
-  const loadCryptoData = () => {
+  const loadCryptoData = async () => {
     try {
       setLoading(true);
       setError(null);
       
-      const data = getCryptoById(cryptoId);
-      if (!data) {
+      // Try to get live data
+      const liveData = await liveDataFetcher.getLivePrice(cryptoId);
+      
+      // Get base data from our database
+      const baseData = getCryptoById(cryptoId);
+      if (!baseData) {
         throw new Error('Cryptocurrency not found');
       }
 
-      // Add some realistic price simulation
-      const priceVariation = (Math.random() - 0.5) * 0.02; // ±1% variation
+      // Merge live data with base data
       const updatedData = {
-        ...data,
-        current_price: data.current_price * (1 + priceVariation),
-        high_24h: data.high_24h * (1 + Math.abs(priceVariation)),
-        low_24h: data.low_24h * (1 - Math.abs(priceVariation)),
+        ...baseData,
+        current_price: liveData?.price || baseData.current_price * (1 + (Math.random() - 0.5) * 0.01),
+        price_change_percentage_24h: liveData?.change24h || baseData.price_change_percentage_24h + (Math.random() - 0.5) * 1,
+        total_volume: liveData?.volume24h || baseData.total_volume,
+        high_24h: (liveData?.price || baseData.current_price) * 1.015,
+        low_24h: (liveData?.price || baseData.current_price) * 0.985,
       };
 
+      setIsLiveData(!!liveData);
       setCryptoData(updatedData);
       setLastUpdate(new Date());
       setLoading(false);
@@ -196,7 +204,7 @@ const CryptoDetailView: React.FC<CryptoDetailViewProps> = ({ cryptoId, onBack })
       loadPriceHistory(mainChartTimeframe);
     } catch (error) {
       console.error('Error loading crypto data:', error);
-      setError('Cryptocurrency not found. Please try again.');
+      setError('Failed to load cryptocurrency data. Please try again.');
       setLoading(false);
     }
   };
@@ -484,10 +492,16 @@ const CryptoDetailView: React.FC<CryptoDetailViewProps> = ({ cryptoId, onBack })
           </div>
         </div>
 
-        <div className="text-center">
+        <div className="text-center space-y-2">
           <p className="text-sm text-muted-foreground">
             Last updated: {lastUpdate.toLocaleTimeString()} • Updates every {timeframes.find(tf => tf.value === updateInterval)?.label}
           </p>
+          <div className="flex items-center justify-center gap-2">
+            <div className={`w-2 h-2 rounded-full ${isLiveData ? 'bg-crypto-green animate-pulse' : 'bg-crypto-orange'}`}></div>
+            <span className="text-xs text-muted-foreground">
+              {isLiveData ? 'Live Market Data' : 'Enhanced Simulation'}
+            </span>
+          </div>
         </div>
 
         {/* Main Price Card */}

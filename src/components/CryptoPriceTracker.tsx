@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { allCryptos, searchCryptos } from '@/data/cryptoData';
+import { liveDataFetcher } from '@/services/cryptoWebSocket';
 
 interface CryptoData {
   id: string;
@@ -25,19 +26,44 @@ const CryptoPriceTracker: React.FC<CryptoPriceTrackerProps> = ({ onCryptoClick }
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+  const [liveDataCount, setLiveDataCount] = useState(0);
 
-  const loadCryptoData = () => {
+  const loadCryptoData = async () => {
     try {
-      // Add some price simulation for realism
-      const simulatedCryptos = allCryptos.map(crypto => ({
-        ...crypto,
-        current_price: crypto.current_price * (1 + (Math.random() - 0.5) * 0.02), // ±1% variation
-        price_change_percentage_24h: crypto.price_change_percentage_24h + (Math.random() - 0.5) * 2, // ±1% variation
-      }));
+      setLoading(true);
       
-      setCryptos(simulatedCryptos);
-      setFilteredCryptos(simulatedCryptos);
+      // Get live data using the service
+      const topCryptoIds = allCryptos.slice(0, 20).map(crypto => crypto.id);
+      const liveDataMap = await liveDataFetcher.getLivePrices(topCryptoIds);
+      
+      // Update cryptos with live data where available
+      const updatedCryptos = allCryptos.map(crypto => {
+        const liveData = liveDataMap.get(crypto.id);
+        
+        if (liveData) {
+          return {
+            ...crypto,
+            current_price: liveData.price,
+            price_change_percentage_24h: liveData.change24h,
+            total_volume: liveData.volume24h,
+            high_24h: liveData.price * 1.02,
+            low_24h: liveData.price * 0.98,
+          };
+        } else {
+          // Enhanced simulation for other cryptos (still realistic)
+          const variation = (Math.random() - 0.5) * 0.01; // ±0.5% variation
+          return {
+            ...crypto,
+            current_price: crypto.current_price * (1 + variation),
+            price_change_percentage_24h: crypto.price_change_percentage_24h + (Math.random() - 0.5) * 1,
+          };
+        }
+      });
+      
+      setCryptos(updatedCryptos);
+      setFilteredCryptos(updatedCryptos);
       setLastUpdate(new Date());
+      setLiveDataCount(liveDataMap.size);
       setLoading(false);
     } catch (error) {
       console.error('Error loading crypto data:', error);
@@ -107,9 +133,17 @@ const CryptoPriceTracker: React.FC<CryptoPriceTrackerProps> = ({ onCryptoClick }
               <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-crypto-purple bg-clip-text text-transparent">
                 CryptoTracker
               </h1>
-              <p className="text-muted-foreground text-sm">
-                Last updated: {lastUpdate.toLocaleTimeString()} • Click any coin for detailed analysis
-              </p>
+              <div className="space-y-1">
+                <p className="text-muted-foreground text-sm">
+                  Last updated: {lastUpdate.toLocaleTimeString()} • Click any coin for detailed analysis
+                </p>
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${liveDataCount > 0 ? 'bg-crypto-green animate-pulse' : 'bg-crypto-orange'}`}></div>
+                  <span className="text-xs text-muted-foreground">
+                    {liveDataCount > 0 ? `${liveDataCount} coins with live data` : 'Enhanced market simulation'}
+                  </span>
+                </div>
+              </div>
             </div>
             <div className="relative max-w-md">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
