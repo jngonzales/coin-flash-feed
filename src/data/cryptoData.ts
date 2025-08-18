@@ -53,7 +53,7 @@ export const cryptoDatabase: CryptoInfo[] = [
     circulating_supply: 19600000,
     max_supply: 21000000,
     total_supply: 19600000,
-    image: getCryptoImage('bitcoin', 'btc'),
+    image: 'https://assets.coingecko.com/coins/images/1/large/bitcoin.png',
     description: 'Bitcoin is the first successful internet money based on peer-to-peer technology; whereby no central bank or authority is involved in the transaction and production of the Bitcoin currency.',
     genesis_date: '2009-01-03'
   },
@@ -75,7 +75,7 @@ export const cryptoDatabase: CryptoInfo[] = [
     circulating_supply: 120000000,
     max_supply: null,
     total_supply: 120000000,
-    image: getCryptoImage('ethereum', 'eth'),
+    image: 'https://assets.coingecko.com/coins/images/279/large/ethereum.png',
     description: 'Ethereum is a decentralized platform that runs smart contracts: applications that run exactly as programmed without any possibility of downtime, censorship, fraud or third-party interference.',
     genesis_date: '2015-07-30'
   },
@@ -97,7 +97,7 @@ export const cryptoDatabase: CryptoInfo[] = [
     circulating_supply: 95000000000,
     max_supply: null,
     total_supply: 95000000000,
-    image: getCryptoImage('tether', 'usdt'),
+    image: 'https://assets.coingecko.com/coins/images/325/large/Tether.png',
     description: 'Tether gives you the joint benefits of open blockchain technology and traditional currency by converting your cash into a stable digital currency equivalent.',
     genesis_date: '2014-10-06'
   },
@@ -201,7 +201,7 @@ const generateMoreCryptos = (): CryptoInfo[] => {
       circulating_supply: Math.random() * 10000000000,
       max_supply: Math.random() > 0.3 ? Math.random() * 20000000000 : null,
       total_supply: Math.random() * 15000000000,
-      image: getCryptoImage(crypto.id, crypto.symbol),
+      image: cryptoImageMap[crypto.id] || getFallbackImage(crypto.symbol),
       description: `${crypto.name} is a cryptocurrency that aims to provide innovative blockchain solutions.`,
       genesis_date: `20${15 + Math.floor(Math.random() * 8)}-${String(Math.floor(Math.random() * 12) + 1).padStart(2, '0')}-${String(Math.floor(Math.random() * 28) + 1).padStart(2, '0')}`
     };
