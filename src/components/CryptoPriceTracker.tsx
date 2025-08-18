@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { allCryptos, searchCryptos } from '@/data/cryptoData';
-import { liveDataFetcher } from '@/services/cryptoWebSocket';
+import { liveDataFetcher, multiApiService } from '@/services/cryptoWebSocket';
 
 interface CryptoData {
   id: string;
@@ -32,48 +32,70 @@ const CryptoPriceTracker: React.FC<CryptoPriceTrackerProps> = ({ onCryptoClick }
     try {
       setLoading(true);
       
-      // Get live data using the service
-      const topCryptoIds = allCryptos.slice(0, 20).map(crypto => crypto.id);
-      const liveDataMap = await liveDataFetcher.getLivePrices(topCryptoIds);
+      // Get live data directly from CoinGecko with your 4 API keys
+      const liveApiData = await multiApiService.getCryptoData();
       
-      // Update cryptos with live data where available
-      const updatedCryptos = allCryptos.map(crypto => {
-        const liveData = liveDataMap.get(crypto.id);
+      if (liveApiData.length > 0) {
+        // We got real live data from CoinGecko!
+        console.log(`🚀 Got LIVE data for ${liveApiData.length} cryptocurrencies!`);
         
-        if (liveData) {
-          return {
-            ...crypto,
-            current_price: liveData.price,
-            price_change_percentage_24h: liveData.change24h,
-            total_volume: liveData.volume24h,
-            high_24h: liveData.price * 1.02,
-            low_24h: liveData.price * 0.98,
-          };
-        } else {
-          // Enhanced simulation for other cryptos (still realistic)
-          const variation = (Math.random() - 0.5) * 0.01; // ±0.5% variation
-          return {
-            ...crypto,
-            current_price: crypto.current_price * (1 + variation),
-            price_change_percentage_24h: crypto.price_change_percentage_24h + (Math.random() - 0.5) * 1,
-          };
-        }
-      });
-      
-      setCryptos(updatedCryptos);
-      setFilteredCryptos(updatedCryptos);
-      setLastUpdate(new Date());
-      setLiveDataCount(liveDataMap.size);
-      setLoading(false);
+        // Create a map for fast lookup
+        const liveDataMap = new Map(liveApiData.map(coin => [coin.id, coin]));
+        
+        // Update all cryptos with live data where available
+        const updatedCryptos = allCryptos.map(crypto => {
+          const liveData = liveDataMap.get(crypto.id);
+          
+          if (liveData) {
+            return {
+              ...crypto,
+              current_price: liveData.current_price,
+              price_change_percentage_24h: liveData.price_change_percentage_24h,
+              market_cap: liveData.market_cap,
+              total_volume: liveData.total_volume,
+              high_24h: liveData.high_24h,
+              low_24h: liveData.low_24h,
+            };
+          } else {
+            // Minimal simulation for unlisted cryptos
+            const variation = (Math.random() - 0.5) * 0.005; // ±0.25% variation
+            return {
+              ...crypto,
+              current_price: crypto.current_price * (1 + variation),
+              price_change_percentage_24h: crypto.price_change_percentage_24h + (Math.random() - 0.5) * 0.5,
+            };
+          }
+        });
+        
+        setCryptos(updatedCryptos);
+        setFilteredCryptos(updatedCryptos);
+        setLastUpdate(new Date());
+        setLiveDataCount(liveApiData.length);
+        setLoading(false);
+      } else {
+        throw new Error('No live data available');
+      }
     } catch (error) {
       console.error('Error loading crypto data:', error);
+      
+      // Fallback to base data with minimal simulation
+      const fallbackCryptos = allCryptos.map(crypto => ({
+        ...crypto,
+        current_price: crypto.current_price * (1 + (Math.random() - 0.5) * 0.01),
+        price_change_percentage_24h: crypto.price_change_percentage_24h + (Math.random() - 0.5) * 1,
+      }));
+      
+      setCryptos(fallbackCryptos);
+      setFilteredCryptos(fallbackCryptos);
+      setLastUpdate(new Date());
+      setLiveDataCount(0);
       setLoading(false);
     }
   };
 
   useEffect(() => {
     loadCryptoData();
-    const interval = setInterval(loadCryptoData, 10000); // Update every 10 seconds
+    const interval = setInterval(loadCryptoData, 5000); // Update every 5 seconds with 4 API keys
     return () => clearInterval(interval);
   }, []);
 

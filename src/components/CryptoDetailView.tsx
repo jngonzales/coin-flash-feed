@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { LineChart as RechartsLineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart, BarChart, Bar, ComposedChart } from 'recharts';
 import { getCryptoById, generatePriceHistory, PricePoint, CryptoInfo } from '@/data/cryptoData';
-import { liveDataFetcher } from '@/services/cryptoWebSocket';
+import { liveDataFetcher, multiApiService, keyManager } from '@/services/cryptoWebSocket';
 import TradingViewChart from './TradingViewChart';
 
 // Using CryptoInfo from data/cryptoData.ts
@@ -173,8 +173,12 @@ const CryptoDetailView: React.FC<CryptoDetailViewProps> = ({ cryptoId, onBack })
       setLoading(true);
       setError(null);
       
-      // Try to get live data
+      // Try to get live data using your 4 CoinGecko API keys
       const liveData = await liveDataFetcher.getLivePrice(cryptoId);
+      
+      // Also try to get from the main API service for more comprehensive data
+      const apiData = await multiApiService.getCryptoData();
+      const apiCoinData = apiData.find(coin => coin.id === cryptoId);
       
       // Get base data from our database
       const baseData = getCryptoById(cryptoId);
@@ -182,17 +186,19 @@ const CryptoDetailView: React.FC<CryptoDetailViewProps> = ({ cryptoId, onBack })
         throw new Error('Cryptocurrency not found');
       }
 
-      // Merge live data with base data
+      // Merge live data with base data (prioritize API data over single coin data)
+      const bestLiveData = apiCoinData || liveData;
       const updatedData = {
         ...baseData,
-        current_price: liveData?.price || baseData.current_price * (1 + (Math.random() - 0.5) * 0.01),
-        price_change_percentage_24h: liveData?.change24h || baseData.price_change_percentage_24h + (Math.random() - 0.5) * 1,
-        total_volume: liveData?.volume24h || baseData.total_volume,
-        high_24h: (liveData?.price || baseData.current_price) * 1.015,
-        low_24h: (liveData?.price || baseData.current_price) * 0.985,
+        current_price: apiCoinData?.current_price || liveData?.price || baseData.current_price,
+        price_change_percentage_24h: apiCoinData?.price_change_percentage_24h || liveData?.change24h || baseData.price_change_percentage_24h,
+        market_cap: apiCoinData?.market_cap || liveData?.marketCap || baseData.market_cap,
+        total_volume: apiCoinData?.total_volume || liveData?.volume24h || baseData.total_volume,
+        high_24h: apiCoinData?.high_24h || (liveData?.price || baseData.current_price) * 1.015,
+        low_24h: apiCoinData?.low_24h || (liveData?.price || baseData.current_price) * 0.985,
       };
 
-      setIsLiveData(!!liveData);
+      setIsLiveData(!!bestLiveData);
       setCryptoData(updatedData);
       setLastUpdate(new Date());
       setLoading(false);
@@ -346,8 +352,13 @@ const CryptoDetailView: React.FC<CryptoDetailViewProps> = ({ cryptoId, onBack })
 
   useEffect(() => {
     const selectedTimeframe = timeframes.find(tf => tf.value === updateInterval);
-    if (selectedTimeframe && selectedTimeframe.seconds > 0 && selectedTimeframe.seconds >= 1) {
-      const interval = setInterval(loadCryptoData, Math.max(selectedTimeframe.seconds * 1000, 1000));
+    if (selectedTimeframe && selectedTimeframe.seconds > 0) {
+      // Optimize intervals for your 4 API keys - much faster updates possible
+      const optimizedInterval = Math.max(
+        selectedTimeframe.seconds * 1000, 
+        2000 // Minimum 2 seconds with 4 keys for efficiency
+      );
+      const interval = setInterval(loadCryptoData, optimizedInterval);
       return () => clearInterval(interval);
     }
   }, [updateInterval, cryptoId]);

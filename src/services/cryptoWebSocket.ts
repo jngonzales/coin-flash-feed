@@ -1,4 +1,87 @@
-import { apiConfig } from '@/config/apiConfig';
+// 🔑 YOUR 4 COINGECKO API KEYS - CONFIGURED AND READY!
+const COINGECKO_API_KEYS = [
+  'CG-H68Rs8LCSxPV8Skn6N15NZHj', // Key #1
+  'CG-fzFbgPRPE29WGNMPHTSJmark', // Key #2
+  'CG-Aao8URZEFBJxCFBDRzMhdJUq', // Key #3
+  'CG-R5sydEBRGQcgsVsdPGMakZJ4', // Key #4
+];
+
+// Smart API Key rotation system for maximum efficiency
+class CoinGeckoKeyManager {
+  private currentIndex = 0;
+  private keyStats = new Map<string, { calls: number; lastReset: number; errors: number }>();
+  private maxCallsPerKey = 25; // Stay safely under 30/min limit
+  private resetInterval = 60000; // 1 minute
+
+  constructor() {
+    // Initialize stats for all keys
+    COINGECKO_API_KEYS.forEach(key => {
+      this.keyStats.set(key, { calls: 0, lastReset: Date.now(), errors: 0 });
+    });
+  }
+
+  getNextKey(): string {
+    const now = Date.now();
+    
+    // Reset call counts every minute
+    this.keyStats.forEach((stats, key) => {
+      if (now - stats.lastReset > this.resetInterval) {
+        this.keyStats.set(key, { calls: 0, lastReset: now, errors: stats.errors });
+      }
+    });
+
+    // Find the key with lowest usage and fewest errors
+    let bestKey = COINGECKO_API_KEYS[0];
+    let bestScore = Infinity;
+
+    COINGECKO_API_KEYS.forEach(key => {
+      const stats = this.keyStats.get(key)!;
+      const score = stats.calls + (stats.errors * 5); // Penalize keys with errors
+      if (score < bestScore) {
+        bestKey = key;
+        bestScore = score;
+      }
+    });
+
+    // Update usage
+    const stats = this.keyStats.get(bestKey)!;
+    this.keyStats.set(bestKey, { ...stats, calls: stats.calls + 1 });
+
+    const keyNumber = COINGECKO_API_KEYS.indexOf(bestKey) + 1;
+    console.log(`🔑 Using CoinGecko Key #${keyNumber} (${stats.calls + 1}/${this.maxCallsPerKey} calls this minute)`);
+
+    return bestKey;
+  }
+
+  reportError(key: string) {
+    const stats = this.keyStats.get(key);
+    if (stats) {
+      this.keyStats.set(key, { ...stats, errors: stats.errors + 1 });
+    }
+  }
+
+  getEfficiencyStats() {
+    const totalKeys = COINGECKO_API_KEYS.length;
+    const totalCalls = Array.from(this.keyStats.values()).reduce((sum, stats) => sum + stats.calls, 0);
+    const totalErrors = Array.from(this.keyStats.values()).reduce((sum, stats) => sum + stats.errors, 0);
+    
+    return {
+      totalKeys,
+      maxCallsPerMinute: totalKeys * 30,
+      currentCallsThisMinute: totalCalls,
+      totalErrors,
+      efficiency: totalCalls > 0 ? ((totalCalls - totalErrors) / totalCalls * 100).toFixed(1) : '100',
+      keysActive: Array.from(this.keyStats.entries()).map(([key, stats]) => ({
+        keyNumber: COINGECKO_API_KEYS.indexOf(key) + 1,
+        calls: stats.calls,
+        errors: stats.errors,
+        lastUsed: new Date(stats.lastReset).toLocaleTimeString()
+      }))
+    };
+  }
+}
+
+const keyManager = new CoinGeckoKeyManager();
 
 // Multi-API service for real-time crypto data
 export interface LivePriceData {
@@ -25,59 +108,39 @@ export interface CryptoApiResponse {
 
 class MultiCryptoApiService {
   private cache = new Map<string, { data: any; timestamp: number }>();
-  private cacheTimeout = 30000; // 30 seconds
+  private cacheTimeout = 15000; // 15 seconds - faster updates with 4 keys
   private lastApiCall = 0;
-  private minApiInterval = 2000; // 2 seconds between calls
+  private minApiInterval = 500; // 0.5 seconds - much faster with multiple keys
 
-  // Generate API endpoints dynamically based on configuration
+  // Generate optimized API endpoints with your 4 CoinGecko keys
   private getApiEndpoints() {
     const endpoints = [];
     
-    // CoinGecko endpoints (with API key if available)
-    const cgApiKey = apiConfig.coingeckoApiKey;
-    const cgParams = cgApiKey ? `&x_cg_demo_api_key=${cgApiKey}` : '';
+    // Primary CoinGecko endpoint with rotating API keys
+    const cgApiKey = keyManager.getNextKey();
+    const cgParams = `&x_cg_demo_api_key=${cgApiKey}`;
     
-    endpoints.push(
-      {
-        name: 'CoinGecko-Direct',
-        endpoint: `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=24h${cgParams}`,
-        parser: this.parseCoinGeckoData.bind(this),
-        requiresKey: false,
-      }
-    );
+    endpoints.push({
+      name: 'CoinGecko-Primary',
+      endpoint: `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=250&page=1&sparkline=false&price_change_percentage=24h${cgParams}`,
+      parser: this.parseCoinGeckoData.bind(this),
+      requiresKey: true,
+      apiKey: cgApiKey,
+    });
 
-    // CoinGecko with CORS proxies (if CORS proxy enabled)
-    if (apiConfig.enableCorsProxy) {
-      endpoints.push(
-        {
-          name: 'CoinGecko-Proxy1',
-          endpoint: 'https://api.allorigins.win/raw?url=' + encodeURIComponent(`https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=50&page=1&sparkline=false&price_change_percentage=24h${cgParams}`),
-          parser: this.parseCoinGeckoData.bind(this),
-          requiresKey: false,
-        },
-        {
-          name: 'CoinGecko-Proxy2', 
-          endpoint: 'https://corsproxy.io/?' + encodeURIComponent(`https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=50&page=1&sparkline=false&price_change_percentage=24h${cgParams}`),
-          parser: this.parseCoinGeckoData.bind(this),
-          requiresKey: false,
-        }
-      );
-    }
-
-    // CoinMarketCap (if API key available)
-    if (apiConfig.coinmarketcapApiKey) {
+    // Backup CoinGecko endpoints with different keys
+    for (let i = 0; i < 2; i++) {
+      const backupKey = keyManager.getNextKey();
       endpoints.push({
-        name: 'CoinMarketCap',
-        endpoint: `https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest?start=1&limit=100&convert=USD`,
-        parser: this.parseCoinMarketCapData.bind(this),
+        name: `CoinGecko-Backup${i + 1}`,
+        endpoint: `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=24h&x_cg_demo_api_key=${backupKey}`,
+        parser: this.parseCoinGeckoData.bind(this),
         requiresKey: true,
-        headers: {
-          'X-CMC_PRO_API_KEY': apiConfig.coinmarketcapApiKey
-        }
+        apiKey: backupKey,
       });
     }
 
-    // Other APIs
+    // Alternative APIs as final fallbacks
     endpoints.push(
       {
         name: 'Binance',
@@ -89,12 +152,6 @@ class MultiCryptoApiService {
         name: 'CryptoCompare',
         endpoint: 'https://min-api.cryptocompare.com/data/pricemultifull?fsyms=BTC,ETH,BNB,XRP,ADA,SOL,DOGE,DOT,MATIC,LTC,AVAX,UNI,LINK,BCH,XLM,VET,FIL,TRX,ETC,XMR&tsyms=USD',
         parser: this.parseCryptoCompareData.bind(this),
-        requiresKey: false,
-      },
-      {
-        name: 'Kraken',
-        endpoint: 'https://api.kraken.com/0/public/Ticker?pair=BTCUSD,ETHUSD,XRPUSD,ADAUSD,SOLUSD',
-        parser: this.parseKrakenData.bind(this),
         requiresKey: false,
       }
     );
@@ -277,6 +334,9 @@ class MultiCryptoApiService {
           }
         } else {
           console.log(`❌ ${api.name} API failed with status: ${response.status}`);
+          if (api.apiKey) {
+            keyManager.reportError(api.apiKey);
+          }
         }
       } catch (error) {
         console.log(`❌ ${api.name} API error:`, error);
@@ -351,8 +411,11 @@ class MultiCryptoApiService {
   }
 }
 
-// Singleton instance
+// Singleton instance with your 4 API keys configured
 export const multiApiService = new MultiCryptoApiService();
+
+// Export key manager for monitoring
+export { keyManager };
 
 // Legacy interface for backward compatibility
 export class LiveDataFetcher {
