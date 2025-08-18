@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { LineChart as RechartsLineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart, BarChart, Bar, ComposedChart } from 'recharts';
 import { getCryptoById, generatePriceHistory, PricePoint, CryptoInfo } from '@/data/cryptoData';
-import { liveDataFetcher, multiApiService, keyManager } from '@/services/cryptoWebSocket';
+import { getSingleCrypto } from '@/services/cryptoWebSocket';
 import TradingViewChart from './TradingViewChart';
 
 // Using CryptoInfo from data/cryptoData.ts
@@ -174,11 +174,7 @@ const CryptoDetailView: React.FC<CryptoDetailViewProps> = ({ cryptoId, onBack })
       setError(null);
       
       // Try to get live data using your 4 CoinGecko API keys
-      const liveData = await liveDataFetcher.getLivePrice(cryptoId);
-      
-      // Also try to get from the main API service for more comprehensive data
-      const apiData = await multiApiService.getCryptoData();
-      const apiCoinData = apiData.find(coin => coin.id === cryptoId);
+      const liveApiData = await getSingleCrypto(cryptoId);
       
       // Get base data from our database
       const baseData = getCryptoById(cryptoId);
@@ -186,19 +182,19 @@ const CryptoDetailView: React.FC<CryptoDetailViewProps> = ({ cryptoId, onBack })
         throw new Error('Cryptocurrency not found');
       }
 
-      // Merge live data with base data (prioritize API data over single coin data)
-      const bestLiveData = apiCoinData || liveData;
+      // Merge live data with base data
       const updatedData = {
         ...baseData,
-        current_price: apiCoinData?.current_price || liveData?.price || baseData.current_price,
-        price_change_percentage_24h: apiCoinData?.price_change_percentage_24h || liveData?.change24h || baseData.price_change_percentage_24h,
-        market_cap: apiCoinData?.market_cap || liveData?.marketCap || baseData.market_cap,
-        total_volume: apiCoinData?.total_volume || liveData?.volume24h || baseData.total_volume,
-        high_24h: apiCoinData?.high_24h || (liveData?.price || baseData.current_price) * 1.015,
-        low_24h: apiCoinData?.low_24h || (liveData?.price || baseData.current_price) * 0.985,
+        current_price: liveApiData?.market_data?.current_price?.usd || baseData.current_price,
+        price_change_percentage_24h: liveApiData?.market_data?.price_change_percentage_24h || baseData.price_change_percentage_24h,
+        market_cap: liveApiData?.market_data?.market_cap?.usd || baseData.market_cap,
+        total_volume: liveApiData?.market_data?.total_volume?.usd || baseData.total_volume,
+        high_24h: liveApiData?.market_data?.high_24h?.usd || baseData.high_24h,
+        low_24h: liveApiData?.market_data?.low_24h?.usd || baseData.low_24h,
+        image: liveApiData?.image?.large || baseData.image,
       };
 
-      setIsLiveData(!!bestLiveData);
+      setIsLiveData(!!liveApiData);
       setCryptoData(updatedData);
       setLastUpdate(new Date());
       setLoading(false);

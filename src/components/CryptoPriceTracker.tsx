@@ -3,8 +3,8 @@ import { Search, TrendingUp, TrendingDown } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { allCryptos, searchCryptos, getCryptoImage } from '@/data/cryptoData';
-import { liveDataFetcher, multiApiService } from '@/services/cryptoWebSocket';
+import { allCryptos, searchCryptos } from '@/data/cryptoData';
+import { getCryptoData } from '@/services/cryptoWebSocket';
 
 interface CryptoData {
   id: string;
@@ -35,54 +35,37 @@ const CryptoPriceTracker: React.FC<CryptoPriceTrackerProps> = ({ onCryptoClick }
         setLoading(true);
       }
       
-      // Get live data directly from CoinGecko with your 4 API keys
-      const liveApiData = await multiApiService.getCryptoData();
+      // Get live data using your 4 CoinGecko API keys
+      const liveApiData = await getCryptoData();
       
       if (liveApiData.length > 0) {
         // We got real live data from CoinGecko!
         console.log(`🚀 Got LIVE data for ${liveApiData.length} cryptocurrencies!`);
         
-        // Create a map for fast lookup
-        const liveDataMap = new Map(liveApiData.map(coin => [coin.id, coin]));
-        
-        // Update all cryptos with live data where available
-        const updatedCryptos = allCryptos.map(crypto => {
-          const liveData = liveDataMap.get(crypto.id);
-          
-          if (liveData) {
-            return {
-              ...crypto,
-              current_price: liveData.current_price,
-              price_change_percentage_24h: liveData.price_change_percentage_24h,
-              market_cap: liveData.market_cap,
-              total_volume: liveData.total_volume,
-              high_24h: liveData.high_24h,
-              low_24h: liveData.low_24h,
-              image: liveData.image || getCryptoImage(crypto.id, crypto.symbol), // Ensure image is always present
-            };
-          } else {
-            // Minimal simulation for unlisted cryptos
-            const variation = (Math.random() - 0.5) * 0.005; // ±0.25% variation
-            return {
-              ...crypto,
-              current_price: crypto.current_price * (1 + variation),
-              price_change_percentage_24h: crypto.price_change_percentage_24h + (Math.random() - 0.5) * 0.5,
-            };
-          }
-        });
-        
-        setCryptos(updatedCryptos);
-        setFilteredCryptos(updatedCryptos);
+        // Use the live data directly (it already has all the fields we need)
+        setCryptos(liveApiData);
+        setFilteredCryptos(liveApiData);
         setLastUpdate(new Date());
         setLiveDataCount(liveApiData.length);
         setLoading(false);
       } else {
-        throw new Error('No live data available');
+        // Fallback to base data with minimal simulation
+        const fallbackCryptos = allCryptos.map(crypto => ({
+          ...crypto,
+          current_price: crypto.current_price * (1 + (Math.random() - 0.5) * 0.01),
+          price_change_percentage_24h: crypto.price_change_percentage_24h + (Math.random() - 0.5) * 1,
+        }));
+        
+        setCryptos(fallbackCryptos);
+        setFilteredCryptos(fallbackCryptos);
+        setLastUpdate(new Date());
+        setLiveDataCount(0);
+        setLoading(false);
       }
     } catch (error) {
       console.error('Error loading crypto data:', error);
       
-      // Fallback to base data with minimal simulation
+      // Fallback to base data
       const fallbackCryptos = allCryptos.map(crypto => ({
         ...crypto,
         current_price: crypto.current_price * (1 + (Math.random() - 0.5) * 0.01),

@@ -1,15 +1,12 @@
 import { useState } from 'react';
 import CryptoPriceTracker from '@/components/CryptoPriceTracker';
 import CryptoDetailView from '@/components/CryptoDetailView';
-import ApiSettings from '@/components/ApiSettings';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import heroImage from '@/assets/crypto-hero.jpg';
-import { TrendingUp, Coins, Brain, Zap, Settings, Key } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { TrendingUp, Coins, Brain, Zap } from 'lucide-react';
 
 const Index = () => {
   const [selectedCrypto, setSelectedCrypto] = useState<string | null>(null);
-  const [showApiSettings, setShowApiSettings] = useState(false);
 
   const handleCryptoClick = (cryptoId: string) => {
     setSelectedCrypto(cryptoId);
@@ -21,10 +18,6 @@ const Index = () => {
 
   if (selectedCrypto) {
     return <CryptoDetailView cryptoId={selectedCrypto} onBack={handleBackToList} />;
-  }
-
-  if (showApiSettings) {
-    return <ApiSettings onClose={() => setShowApiSettings(false)} />;
   }
 
   return (
@@ -64,16 +57,7 @@ const Index = () => {
             </div>
           </div>
           
-          <div className="flex items-center justify-center gap-4">
-            <Button
-              onClick={() => setShowApiSettings(true)}
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-2"
-            >
-              <Key className="w-4 h-4" />
-              Get Live Data
-            </Button>
+          <div className="flex justify-center">
             <ThemeToggle />
           </div>
         </div>
