@@ -104,6 +104,7 @@ export interface CryptoApiResponse {
   total_volume: number;
   high_24h: number;
   low_24h: number;
+  image?: string;
 }
 
 class MultiCryptoApiService {
@@ -170,6 +171,7 @@ class MultiCryptoApiService {
       total_volume: coin.total_volume,
       high_24h: coin.high_24h,
       low_24h: coin.low_24h,
+      image: coin.image, // Preserve CoinGecko images
     }));
   }
 

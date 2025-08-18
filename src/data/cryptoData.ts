@@ -53,7 +53,7 @@ export const cryptoDatabase: CryptoInfo[] = [
     circulating_supply: 19600000,
     max_supply: 21000000,
     total_supply: 19600000,
-    image: 'https://assets.coingecko.com/coins/images/1/large/bitcoin.png',
+    image: getCryptoImage('bitcoin', 'btc'),
     description: 'Bitcoin is the first successful internet money based on peer-to-peer technology; whereby no central bank or authority is involved in the transaction and production of the Bitcoin currency.',
     genesis_date: '2009-01-03'
   },
@@ -75,7 +75,7 @@ export const cryptoDatabase: CryptoInfo[] = [
     circulating_supply: 120000000,
     max_supply: null,
     total_supply: 120000000,
-    image: 'https://assets.coingecko.com/coins/images/279/large/ethereum.png',
+    image: getCryptoImage('ethereum', 'eth'),
     description: 'Ethereum is a decentralized platform that runs smart contracts: applications that run exactly as programmed without any possibility of downtime, censorship, fraud or third-party interference.',
     genesis_date: '2015-07-30'
   },
@@ -97,41 +97,83 @@ export const cryptoDatabase: CryptoInfo[] = [
     circulating_supply: 95000000000,
     max_supply: null,
     total_supply: 95000000000,
-    image: 'https://assets.coingecko.com/coins/images/325/large/Tether.png',
+    image: getCryptoImage('tether', 'usdt'),
     description: 'Tether gives you the joint benefits of open blockchain technology and traditional currency by converting your cash into a stable digital currency equivalent.',
     genesis_date: '2014-10-06'
   },
   // Add more cryptocurrencies...
 ];
 
+// Comprehensive cryptocurrency image mapping
+const cryptoImageMap: { [key: string]: string } = {
+  'bitcoin': 'https://assets.coingecko.com/coins/images/1/large/bitcoin.png',
+  'ethereum': 'https://assets.coingecko.com/coins/images/279/large/ethereum.png',
+  'tether': 'https://assets.coingecko.com/coins/images/325/large/Tether.png',
+  'binancecoin': 'https://assets.coingecko.com/coins/images/825/large/bnb-icon2_2x.png',
+  'ripple': 'https://assets.coingecko.com/coins/images/44/large/xrp-symbol-white-128.png',
+  'solana': 'https://assets.coingecko.com/coins/images/4128/large/solana.png',
+  'usd-coin': 'https://assets.coingecko.com/coins/images/6319/large/USD_Coin_icon.png',
+  'cardano': 'https://assets.coingecko.com/coins/images/975/large/cardano.png',
+  'dogecoin': 'https://assets.coingecko.com/coins/images/5/large/dogecoin.png',
+  'avalanche-2': 'https://assets.coingecko.com/coins/images/12559/large/Avalanche_Circle_RedWhite_Trans.png',
+  'tron': 'https://assets.coingecko.com/coins/images/1094/large/tron-logo.png',
+  'chainlink': 'https://assets.coingecko.com/coins/images/877/large/chainlink-new-logo.png',
+  'matic-network': 'https://assets.coingecko.com/coins/images/4713/large/matic-token-icon.png',
+  'wrapped-bitcoin': 'https://assets.coingecko.com/coins/images/7598/large/wrapped_bitcoin_wbtc.png',
+  'polkadot': 'https://assets.coingecko.com/coins/images/12171/large/polkadot.png',
+  'litecoin': 'https://assets.coingecko.com/coins/images/2/large/litecoin.png',
+  'shiba-inu': 'https://assets.coingecko.com/coins/images/11939/large/shiba.png',
+  'dai': 'https://assets.coingecko.com/coins/images/9956/large/4943.png',
+  'bitcoin-cash': 'https://assets.coingecko.com/coins/images/780/large/bitcoin-cash-circle.png',
+  'uniswap': 'https://assets.coingecko.com/coins/images/12504/large/uniswap-uni.png',
+  'cosmos': 'https://assets.coingecko.com/coins/images/1481/large/cosmos_hub.png',
+  'leo-token': 'https://assets.coingecko.com/coins/images/8418/large/leo-token.png',
+  'ethereum-classic': 'https://assets.coingecko.com/coins/images/453/large/ethereum-classic-logo.png',
+  'monero': 'https://assets.coingecko.com/coins/images/69/large/monero_logo.png',
+  'stellar': 'https://assets.coingecko.com/coins/images/100/large/Stellar_symbol_black_RGB.png',
+  'okb': 'https://assets.coingecko.com/coins/images/4463/large/WeChat_Image_20220118095654.png',
+  'filecoin': 'https://assets.coingecko.com/coins/images/12817/large/filecoin.png',
+  'hedera-hashgraph': 'https://assets.coingecko.com/coins/images/3441/large/Hedera_Hashgraph_Logo.png',
+};
+
+// Generate fallback image URL
+const getFallbackImage = (symbol: string): string => {
+  return `https://via.placeholder.com/32x32/3B82F6/FFFFFF?text=${symbol.toUpperCase().slice(0, 2)}`;
+};
+
+// Get crypto image with fallback
+export const getCryptoImage = (id: string, symbol: string): string => {
+  return cryptoImageMap[id] || cryptoImageMap[symbol] || getFallbackImage(symbol);
+};
+
 // Generate additional cryptocurrencies
 const generateMoreCryptos = (): CryptoInfo[] => {
   const additionalCryptos = [
-    { name: 'BNB', symbol: 'bnb', basePrice: 310 },
-    { name: 'XRP', symbol: 'xrp', basePrice: 0.62 },
-    { name: 'Solana', symbol: 'sol', basePrice: 98 },
-    { name: 'USDC', symbol: 'usdc', basePrice: 1.00 },
-    { name: 'Cardano', symbol: 'ada', basePrice: 0.48 },
-    { name: 'Dogecoin', symbol: 'doge', basePrice: 0.082 },
-    { name: 'Avalanche', symbol: 'avax', basePrice: 37 },
-    { name: 'TRON', symbol: 'trx', basePrice: 0.105 },
-    { name: 'Chainlink', symbol: 'link', basePrice: 15.2 },
-    { name: 'Polygon', symbol: 'matic', basePrice: 0.89 },
-    { name: 'Wrapped Bitcoin', symbol: 'wbtc', basePrice: 43200 },
-    { name: 'Polkadot', symbol: 'dot', basePrice: 7.1 },
-    { name: 'Litecoin', symbol: 'ltc', basePrice: 73 },
-    { name: 'Shiba Inu', symbol: 'shib', basePrice: 0.0000095 },
-    { name: 'Dai', symbol: 'dai', basePrice: 1.00 },
-    { name: 'Bitcoin Cash', symbol: 'bch', basePrice: 245 },
-    { name: 'Uniswap', symbol: 'uni', basePrice: 6.8 },
-    { name: 'Cosmos', symbol: 'atom', basePrice: 10.2 },
-    { name: 'LEO Token', symbol: 'leo', basePrice: 3.9 },
-    { name: 'Ethereum Classic', symbol: 'etc', basePrice: 21 },
-    { name: 'Monero', symbol: 'xmr', basePrice: 158 },
-    { name: 'Stellar', symbol: 'xlm', basePrice: 0.12 },
-    { name: 'OKB', symbol: 'okb', basePrice: 49 },
-    { name: 'Filecoin', symbol: 'fil', basePrice: 5.2 },
-    { name: 'Hedera', symbol: 'hbar', basePrice: 0.062 }
+    { name: 'BNB', symbol: 'bnb', id: 'binancecoin', basePrice: 310 },
+    { name: 'XRP', symbol: 'xrp', id: 'ripple', basePrice: 0.62 },
+    { name: 'Solana', symbol: 'sol', id: 'solana', basePrice: 98 },
+    { name: 'USDC', symbol: 'usdc', id: 'usd-coin', basePrice: 1.00 },
+    { name: 'Cardano', symbol: 'ada', id: 'cardano', basePrice: 0.48 },
+    { name: 'Dogecoin', symbol: 'doge', id: 'dogecoin', basePrice: 0.082 },
+    { name: 'Avalanche', symbol: 'avax', id: 'avalanche-2', basePrice: 37 },
+    { name: 'TRON', symbol: 'trx', id: 'tron', basePrice: 0.105 },
+    { name: 'Chainlink', symbol: 'link', id: 'chainlink', basePrice: 15.2 },
+    { name: 'Polygon', symbol: 'matic', id: 'matic-network', basePrice: 0.89 },
+    { name: 'Wrapped Bitcoin', symbol: 'wbtc', id: 'wrapped-bitcoin', basePrice: 43200 },
+    { name: 'Polkadot', symbol: 'dot', id: 'polkadot', basePrice: 7.1 },
+    { name: 'Litecoin', symbol: 'ltc', id: 'litecoin', basePrice: 73 },
+    { name: 'Shiba Inu', symbol: 'shib', id: 'shiba-inu', basePrice: 0.0000095 },
+    { name: 'Dai', symbol: 'dai', id: 'dai', basePrice: 1.00 },
+    { name: 'Bitcoin Cash', symbol: 'bch', id: 'bitcoin-cash', basePrice: 245 },
+    { name: 'Uniswap', symbol: 'uni', id: 'uniswap', basePrice: 6.8 },
+    { name: 'Cosmos', symbol: 'atom', id: 'cosmos', basePrice: 10.2 },
+    { name: 'LEO Token', symbol: 'leo', id: 'leo-token', basePrice: 3.9 },
+    { name: 'Ethereum Classic', symbol: 'etc', id: 'ethereum-classic', basePrice: 21 },
+    { name: 'Monero', symbol: 'xmr', id: 'monero', basePrice: 158 },
+    { name: 'Stellar', symbol: 'xlm', id: 'stellar', basePrice: 0.12 },
+    { name: 'OKB', symbol: 'okb', id: 'okb', basePrice: 49 },
+    { name: 'Filecoin', symbol: 'fil', id: 'filecoin', basePrice: 5.2 },
+    { name: 'Hedera', symbol: 'hbar', id: 'hedera-hashgraph', basePrice: 0.062 }
   ];
 
   return additionalCryptos.map((crypto, index) => {
@@ -142,7 +184,7 @@ const generateMoreCryptos = (): CryptoInfo[] => {
     const change30d = (Math.random() - 0.5) * 60; // -30% to +30%
     
     return {
-      id: crypto.symbol,
+      id: crypto.id,
       symbol: crypto.symbol,
       name: crypto.name,
       current_price: crypto.basePrice,
@@ -159,7 +201,7 @@ const generateMoreCryptos = (): CryptoInfo[] => {
       circulating_supply: Math.random() * 10000000000,
       max_supply: Math.random() > 0.3 ? Math.random() * 20000000000 : null,
       total_supply: Math.random() * 15000000000,
-      image: `https://assets.coingecko.com/coins/images/${rank}/large/${crypto.symbol}.png`,
+      image: getCryptoImage(crypto.id, crypto.symbol),
       description: `${crypto.name} is a cryptocurrency that aims to provide innovative blockchain solutions.`,
       genesis_date: `20${15 + Math.floor(Math.random() * 8)}-${String(Math.floor(Math.random() * 12) + 1).padStart(2, '0')}-${String(Math.floor(Math.random() * 28) + 1).padStart(2, '0')}`
     };
@@ -168,7 +210,7 @@ const generateMoreCryptos = (): CryptoInfo[] => {
 
 export const allCryptos = [...cryptoDatabase, ...generateMoreCryptos()];
 
-// Generate realistic OHLCV data for any timeframe
+// Generate realistic OHLCV data with proper trading patterns
 export const generatePriceHistory = (
   crypto: CryptoInfo,
   timeframe: string,
@@ -189,44 +231,63 @@ export const generatePriceHistory = (
     timeStepMs = parseInt(timeframeValue) * 60 * 60 * 1000;
   } else if (timeframeValue.includes('d')) {
     timeStepMs = parseInt(timeframeValue) * 24 * 60 * 60 * 1000;
+  } else if (timeframeValue.includes('w')) {
+    timeStepMs = 7 * 24 * 60 * 60 * 1000;
   } else if (timeframeValue.includes('M')) {
     timeStepMs = parseInt(timeframeValue) * 30 * 24 * 60 * 60 * 1000;
   } else if (timeframeValue.includes('Y')) {
     timeStepMs = parseInt(timeframeValue) * 365 * 24 * 60 * 60 * 1000;
   } else {
-    timeStepMs = 24 * 60 * 60 * 1000; // Default to 1 day
+    timeStepMs = 60 * 60 * 1000; // Default to 1 hour
   }
 
   const totalTimeSpan = timeStepMs * points;
   const startTime = now - totalTimeSpan;
   
-  // Base volatility on the crypto's 24h change
-  const baseVolatility = Math.abs(crypto.price_change_percentage_24h) / 100 * 0.1;
+  // Create realistic market patterns
+  const baseVolatility = Math.abs(crypto.price_change_percentage_24h) / 100 * 0.05;
   const trendStrength = crypto.price_change_percentage_24h / 100;
   
-  let currentPrice = crypto.current_price * (1 - trendStrength);
+  // Start from a price that would result in current price after trend
+  let currentPrice = crypto.current_price / (1 + trendStrength);
+  
+  // Add market patterns: support/resistance, trends, consolidation
+  const patterns = {
+    trend: Math.random() > 0.5 ? 1 : -1, // Overall trend direction
+    volatility: 0.02 + Math.random() * 0.08, // 2-10% volatility
+    momentum: Math.random() * 0.5 + 0.5, // Momentum strength
+  };
   
   for (let i = 0; i < points; i++) {
     const timestamp = startTime + (i * timeStepMs);
     const date = new Date(timestamp);
+    const progress = i / points;
     
-    // Generate realistic OHLCV data
-    const volatility = baseVolatility * (0.5 + Math.random());
-    const trendComponent = (trendStrength * i / points) * currentPrice;
-    const randomComponent = (Math.random() - 0.5) * volatility * currentPrice;
+    // Calculate trend component (gradual move toward current price)
+    const targetPrice = crypto.current_price;
+    const trendComponent = (targetPrice - currentPrice) * (progress * 0.1);
     
+    // Add realistic noise and patterns
+    const noise = (Math.random() - 0.5) * patterns.volatility * currentPrice;
+    const momentum = Math.sin(progress * Math.PI * 4) * patterns.momentum * baseVolatility * currentPrice;
+    
+    // Create more realistic price movements
     const open = currentPrice;
-    const priceMove = trendComponent + randomComponent;
-    const close = Math.max(0.0001, currentPrice + priceMove);
+    const priceChange = trendComponent + noise + momentum;
+    const close = Math.max(0.0001, open + priceChange);
     
-    // Generate high and low based on volatility
-    const range = volatility * currentPrice * (0.5 + Math.random() * 0.5);
-    const high = Math.max(open, close) + range * Math.random();
-    const low = Math.min(open, close) - range * Math.random();
+    // Generate realistic high and low with proper wicks
+    const wickRange = patterns.volatility * currentPrice * (0.3 + Math.random() * 0.7);
+    const bodyRange = Math.abs(close - open);
     
-    // Generate volume (higher volume during price movements)
-    const volumeMultiplier = 1 + Math.abs(priceMove / currentPrice) * 10;
-    const volume = crypto.total_volume * (0.1 + Math.random() * 0.9) * volumeMultiplier;
+    // High and low should extend beyond the body realistically
+    const high = Math.max(open, close) + wickRange * Math.random() * 0.8;
+    const low = Math.min(open, close) - wickRange * Math.random() * 0.8;
+    
+    // Volume should correlate with price movement intensity
+    const priceMovementIntensity = Math.abs(priceChange) / currentPrice;
+    const volumeMultiplier = 0.5 + priceMovementIntensity * 5 + Math.random() * 2;
+    const volume = crypto.total_volume * volumeMultiplier * (0.1 + Math.random() * 0.9);
     
     history.push({
       timestamp,
@@ -240,6 +301,14 @@ export const generatePriceHistory = (
     });
     
     currentPrice = close;
+  }
+  
+  // Ensure the last price is close to the actual current price
+  if (history.length > 0) {
+    const lastCandle = history[history.length - 1];
+    lastCandle.close = crypto.current_price;
+    lastCandle.high = Math.max(lastCandle.high, crypto.current_price);
+    lastCandle.low = Math.min(lastCandle.low, crypto.current_price);
   }
   
   return history;

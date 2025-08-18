@@ -3,7 +3,7 @@ import { Search, TrendingUp, TrendingDown } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { allCryptos, searchCryptos } from '@/data/cryptoData';
+import { allCryptos, searchCryptos, getCryptoImage } from '@/data/cryptoData';
 import { liveDataFetcher, multiApiService } from '@/services/cryptoWebSocket';
 
 interface CryptoData {
@@ -28,9 +28,12 @@ const CryptoPriceTracker: React.FC<CryptoPriceTrackerProps> = ({ onCryptoClick }
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [liveDataCount, setLiveDataCount] = useState(0);
 
-  const loadCryptoData = async () => {
+  const loadCryptoData = async (isInitialLoad = false) => {
     try {
-      setLoading(true);
+      // Only show loading on initial load, not on updates
+      if (isInitialLoad) {
+        setLoading(true);
+      }
       
       // Get live data directly from CoinGecko with your 4 API keys
       const liveApiData = await multiApiService.getCryptoData();
@@ -55,6 +58,7 @@ const CryptoPriceTracker: React.FC<CryptoPriceTrackerProps> = ({ onCryptoClick }
               total_volume: liveData.total_volume,
               high_24h: liveData.high_24h,
               low_24h: liveData.low_24h,
+              image: liveData.image || getCryptoImage(crypto.id, crypto.symbol), // Ensure image is always present
             };
           } else {
             // Minimal simulation for unlisted cryptos
@@ -94,8 +98,8 @@ const CryptoPriceTracker: React.FC<CryptoPriceTrackerProps> = ({ onCryptoClick }
   };
 
   useEffect(() => {
-    loadCryptoData();
-    const interval = setInterval(loadCryptoData, 5000); // Update every 5 seconds with 4 API keys
+    loadCryptoData(true); // Initial load with loading state
+    const interval = setInterval(() => loadCryptoData(false), 5000); // Updates without loading flicker
     return () => clearInterval(interval);
   }, []);
 
