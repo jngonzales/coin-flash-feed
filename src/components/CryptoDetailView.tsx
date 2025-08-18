@@ -842,12 +842,25 @@ const CryptoDetailView: React.FC<CryptoDetailViewProps> = ({ cryptoId, onBack })
                   </div>
                 ) : (
                   <div className="space-y-6">
-                    {/* TradingView-Style Chart for Price History */}
-                    <TradingViewChart 
-                      data={generatePriceHistory(cryptoData, historyTimeframe, 200)} 
-                      showVolume={true}
-                      height={500}
-                    />
+                    {/* Professional Trading Chart for Price History */}
+                    <div className="border rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-semibold">Price History - {historyTimeframe}</h3>
+                        <Select value={historyTimeframe} onValueChange={setHistoryTimeframe}>
+                          <SelectTrigger className="w-32">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {timeframes.map((timeframe) => (
+                              <SelectItem key={timeframe.value} value={timeframe.value}>
+                                {timeframe.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <ProfessionalTradingChart cryptoData={cryptoData} height={500} />
+                    </div>
 
                     {/* Price Statistics */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
