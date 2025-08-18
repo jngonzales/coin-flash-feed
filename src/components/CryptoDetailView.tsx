@@ -176,10 +176,37 @@ const CryptoDetailView: React.FC<CryptoDetailViewProps> = ({ cryptoId, onBack })
       // Try to get live data using your 4 CoinGecko API keys
       const liveApiData = await getSingleCrypto(cryptoId);
       
-      // Get base data from our database
-      const baseData = getCryptoById(cryptoId);
+      // Get base data from our database, or create from live data
+      let baseData = getCryptoById(cryptoId);
+      
+      // If not in our database but we have live data, create base data from live data
+      if (!baseData && liveApiData) {
+        baseData = {
+          id: liveApiData.id || cryptoId,
+          symbol: liveApiData.symbol || cryptoId,
+          name: liveApiData.name || cryptoId.toUpperCase(),
+          current_price: liveApiData.market_data?.current_price?.usd || 0,
+          price_change_percentage_24h: liveApiData.market_data?.price_change_percentage_24h || 0,
+          price_change_percentage_7d: liveApiData.market_data?.price_change_percentage_7d || 0,
+          price_change_percentage_30d: liveApiData.market_data?.price_change_percentage_30d || 0,
+          market_cap: liveApiData.market_data?.market_cap?.usd || 0,
+          market_cap_rank: liveApiData.market_cap_rank || 999,
+          total_volume: liveApiData.market_data?.total_volume?.usd || 0,
+          high_24h: liveApiData.market_data?.high_24h?.usd || 0,
+          low_24h: liveApiData.market_data?.low_24h?.usd || 0,
+          ath: liveApiData.market_data?.ath?.usd || 0,
+          ath_change_percentage: liveApiData.market_data?.ath_change_percentage?.usd || 0,
+          circulating_supply: liveApiData.market_data?.circulating_supply || 0,
+          max_supply: liveApiData.market_data?.max_supply || null,
+          total_supply: liveApiData.market_data?.total_supply || 0,
+          image: liveApiData.image?.large || `https://via.placeholder.com/64x64/3B82F6/FFFFFF?text=${cryptoId.slice(0, 2).toUpperCase()}`,
+          description: liveApiData.description?.en?.substring(0, 500) + '...' || `${liveApiData.name || cryptoId} is a cryptocurrency.`,
+          genesis_date: liveApiData.genesis_date || null,
+        };
+      }
+      
       if (!baseData) {
-        throw new Error('Cryptocurrency not found');
+        throw new Error('Cryptocurrency not found and no live data available');
       }
 
       // Merge live data with base data

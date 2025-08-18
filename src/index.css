@@ -129,3 +129,28 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
   }
 }
+
+/* Smooth number transitions */
+.price-transition {
+  transition: all 0.3s ease-in-out;
+}
+
+.price-flash-green {
+  animation: flash-green 0.5s ease-in-out;
+}
+
+.price-flash-red {
+  animation: flash-red 0.5s ease-in-out;
+}
+
+@keyframes flash-green {
+  0% { background-color: transparent; }
+  50% { background-color: hsl(var(--crypto-green) / 0.2); }
+  100% { background-color: transparent; }
+}
+
+@keyframes flash-red {
+  0% { background-color: transparent; }
+  50% { background-color: hsl(var(--crypto-red) / 0.2); }
+  100% { background-color: transparent; }
+}

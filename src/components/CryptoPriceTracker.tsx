@@ -42,41 +42,66 @@ const CryptoPriceTracker: React.FC<CryptoPriceTrackerProps> = ({ onCryptoClick }
         // We got real live data from CoinGecko!
         console.log(`🚀 Got LIVE data for ${liveApiData.length} cryptocurrencies!`);
         
-        // Use the live data directly (it already has all the fields we need)
-        setCryptos(liveApiData);
-        setFilteredCryptos(liveApiData);
+        // SMOOTH UPDATE: Only update existing cryptos, don't replace the entire array
+        setCryptos(prevCryptos => {
+          // If this is initial load, use live data directly
+          if (isInitialLoad || prevCryptos.length === 0) {
+            return liveApiData;
+          }
+          
+          // For updates: merge live data with existing data to avoid layout shifts
+          const liveDataMap = new Map(liveApiData.map(coin => [coin.id, coin]));
+          
+          return prevCryptos.map(existingCrypto => {
+            const liveData = liveDataMap.get(existingCrypto.id);
+            if (liveData) {
+              // Smooth update: only change the numbers, keep everything else stable
+              return {
+                ...existingCrypto,
+                current_price: liveData.current_price,
+                price_change_percentage_24h: liveData.price_change_percentage_24h,
+                market_cap: liveData.market_cap,
+                total_volume: liveData.total_volume,
+                high_24h: liveData.high_24h,
+                low_24h: liveData.low_24h,
+              };
+            }
+            return existingCrypto; // Keep existing crypto if no live data
+          });
+        });
+        
+        // Update filtered cryptos only if search is active
+        setFilteredCryptos(prevFiltered => {
+          if (searchTerm.trim() === '') {
+            return cryptos; // Will be updated by the cryptos state change
+          }
+          return prevFiltered; // Keep current search results stable
+        });
+        
         setLastUpdate(new Date());
         setLiveDataCount(liveApiData.length);
-        setLoading(false);
+        if (isInitialLoad) setLoading(false);
       } else {
-        // Fallback to base data with minimal simulation
-        const fallbackCryptos = allCryptos.map(crypto => ({
-          ...crypto,
-          current_price: crypto.current_price * (1 + (Math.random() - 0.5) * 0.01),
-          price_change_percentage_24h: crypto.price_change_percentage_24h + (Math.random() - 0.5) * 1,
-        }));
-        
-        setCryptos(fallbackCryptos);
-        setFilteredCryptos(fallbackCryptos);
-        setLastUpdate(new Date());
-        setLiveDataCount(0);
-        setLoading(false);
+        // Only update if this is initial load
+        if (isInitialLoad) {
+          setCryptos(allCryptos);
+          setFilteredCryptos(allCryptos);
+          setLastUpdate(new Date());
+          setLiveDataCount(0);
+          setLoading(false);
+        }
       }
     } catch (error) {
       console.error('Error loading crypto data:', error);
       
-      // Fallback to base data
-      const fallbackCryptos = allCryptos.map(crypto => ({
-        ...crypto,
-        current_price: crypto.current_price * (1 + (Math.random() - 0.5) * 0.01),
-        price_change_percentage_24h: crypto.price_change_percentage_24h + (Math.random() - 0.5) * 1,
-      }));
-      
-      setCryptos(fallbackCryptos);
-      setFilteredCryptos(fallbackCryptos);
-      setLastUpdate(new Date());
-      setLiveDataCount(0);
-      setLoading(false);
+      // Only update if this is initial load
+      if (isInitialLoad) {
+        setCryptos(allCryptos);
+        setFilteredCryptos(allCryptos);
+        setLastUpdate(new Date());
+        setLiveDataCount(0);
+        setLoading(false);
+      }
     }
   };
 
@@ -90,7 +115,10 @@ const CryptoPriceTracker: React.FC<CryptoPriceTrackerProps> = ({ onCryptoClick }
     if (searchTerm.trim() === '') {
       setFilteredCryptos(cryptos);
     } else {
-      const filtered = searchCryptos(searchTerm);
+      const filtered = cryptos.filter(crypto =>
+        crypto.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        crypto.symbol.toLowerCase().includes(searchTerm.toLowerCase())
+      );
       setFilteredCryptos(filtered);
     }
   }, [searchTerm, cryptos]);
@@ -206,10 +234,10 @@ const CryptoPriceTracker: React.FC<CryptoPriceTrackerProps> = ({ onCryptoClick }
                   <div className="flex flex-col sm:flex-row items-end sm:items-center gap-3 sm:gap-6 text-right">
                     {/* Price */}
                     <div className="min-w-0">
-                      <div className="text-lg font-bold text-foreground group-hover:text-primary transition-colors duration-200">
+                      <div className="text-lg font-bold text-foreground group-hover:text-primary price-transition">
                         {formatPrice(crypto.current_price)}
                       </div>
-                      <div className="text-sm text-muted-foreground">
+                      <div className="text-sm text-muted-foreground price-transition">
                         {formatMarketCap(crypto.market_cap)}
                       </div>
                     </div>
@@ -223,7 +251,7 @@ const CryptoPriceTracker: React.FC<CryptoPriceTrackerProps> = ({ onCryptoClick }
                       )}
                       <Badge
                         variant={crypto.price_change_percentage_24h > 0 ? 'default' : 'destructive'}
-                        className={`transition-all duration-300 group-hover:scale-105 ${
+                        className={`price-transition group-hover:scale-105 ${
                           crypto.price_change_percentage_24h > 0
                             ? 'bg-crypto-green/10 text-crypto-green border-crypto-green/20 hover:bg-crypto-green/20'
                             : 'bg-crypto-red/10 text-crypto-red border-crypto-red/20 hover:bg-crypto-red/20'
