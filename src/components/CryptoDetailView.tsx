@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { LineChart as RechartsLineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart, BarChart, Bar, ComposedChart } from 'recharts';
 import { getCryptoById, generatePriceHistory, PricePoint, CryptoInfo } from '@/data/cryptoData';
 import { getSingleCrypto } from '@/services/cryptoWebSocket';
-import TradingViewChart from './TradingViewChart';
+import ProfessionalTradingChart from './ProfessionalTradingChart';
 
 // Using CryptoInfo from data/cryptoData.ts
 // Using PricePoint from data/cryptoData.ts
@@ -168,9 +168,11 @@ const CryptoDetailView: React.FC<CryptoDetailViewProps> = ({ cryptoId, onBack })
   
   const { addToWatchlist, removeFromWatchlist, isInWatchlist } = useWatchlist();
 
-  const loadCryptoData = async () => {
+  const loadCryptoData = async (isInitialLoad = false) => {
     try {
-      setLoading(true);
+      if (isInitialLoad) {
+        setLoading(true);
+      }
       setError(null);
       
       // Try to get live data using your 4 CoinGecko API keys
@@ -224,7 +226,9 @@ const CryptoDetailView: React.FC<CryptoDetailViewProps> = ({ cryptoId, onBack })
       setIsLiveData(!!liveApiData);
       setCryptoData(updatedData);
       setLastUpdate(new Date());
-      setLoading(false);
+      if (isInitialLoad) {
+        setLoading(false);
+      }
       
       // Generate AI predictions
       generateAIPredictions(updatedData);
@@ -364,7 +368,7 @@ const CryptoDetailView: React.FC<CryptoDetailViewProps> = ({ cryptoId, onBack })
   };
 
   useEffect(() => {
-    loadCryptoData();
+    loadCryptoData(true);
   }, [cryptoId]);
 
   useEffect(() => {
@@ -381,7 +385,7 @@ const CryptoDetailView: React.FC<CryptoDetailViewProps> = ({ cryptoId, onBack })
         selectedTimeframe.seconds * 1000, 
         2000 // Minimum 2 seconds with 4 keys for efficiency
       );
-      const interval = setInterval(loadCryptoData, optimizedInterval);
+      const interval = setInterval(() => loadCryptoData(false), optimizedInterval);
       return () => clearInterval(interval);
     }
   }, [updateInterval, cryptoId]);
@@ -510,25 +514,13 @@ const CryptoDetailView: React.FC<CryptoDetailViewProps> = ({ cryptoId, onBack })
               <ExternalLink className="w-4 h-4" />
             </Button>
             
-            {/* Update Frequency */}
-            <Select value={updateInterval} onValueChange={setUpdateInterval}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Update frequency" />
-              </SelectTrigger>
-              <SelectContent>
-                {timeframes.map((timeframe) => (
-                  <SelectItem key={timeframe.value} value={timeframe.value}>
-                    {timeframe.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+
           </div>
         </div>
 
         <div className="text-center space-y-2">
           <p className="text-sm text-muted-foreground">
-            Last updated: {lastUpdate.toLocaleTimeString()} • Updates every {timeframes.find(tf => tf.value === updateInterval)?.label}
+            Last updated: {lastUpdate.toLocaleTimeString()} • Updates every 5 seconds
           </p>
           <div className="flex items-center justify-center gap-2">
             <div className={`w-2 h-2 rounded-full ${isLiveData ? 'bg-crypto-green animate-pulse' : 'bg-crypto-orange'}`}></div>
@@ -545,7 +537,7 @@ const CryptoDetailView: React.FC<CryptoDetailViewProps> = ({ cryptoId, onBack })
               <h2 className="text-2xl font-bold">{cryptoData.name} ({cryptoData.symbol.toUpperCase()})</h2>
               <Badge variant="secondary" className="animate-slide-up">#{cryptoData.market_cap_rank}</Badge>
             </div>
-            <div className="text-5xl md:text-6xl font-bold text-foreground mb-2 animate-fade-in bg-gradient-to-r from-primary to-crypto-purple bg-clip-text text-transparent">
+            <div className="text-5xl md:text-6xl font-bold text-foreground mb-2 animate-fade-in bg-gradient-to-r from-primary to-crypto-purple bg-clip-text text-transparent price-transition">
               {formatPrice(cryptoData.current_price)}
             </div>
             <div className="flex items-center justify-center gap-2 animate-slide-up">
@@ -601,175 +593,8 @@ const CryptoDetailView: React.FC<CryptoDetailViewProps> = ({ cryptoId, onBack })
           </Card>
         </div>
 
-        {/* Main Price Chart */}
-        <Card className="animate-fade-in">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <BarChart2 className="w-5 h-5" />
-                Live Price Chart
-              </CardTitle>
-              <div className="flex items-center gap-2">
-                <Select value={mainChartTimeframe} onValueChange={setMainChartTimeframe}>
-                  <SelectTrigger className="w-32">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="5m">5 minutes</SelectItem>
-                    <SelectItem value="15m">15 minutes</SelectItem>
-                    <SelectItem value="1h">1 hour</SelectItem>
-                    <SelectItem value="4h">4 hours</SelectItem>
-                    <SelectItem value="1d">1 day</SelectItem>
-                    <SelectItem value="1w">1 week</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={chartType} onValueChange={(value: 'line' | 'area' | 'candlestick') => setChartType(value)}>
-                  <SelectTrigger className="w-32">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="candlestick">Candlestick</SelectItem>
-                    <SelectItem value="area">Area</SelectItem>
-                    <SelectItem value="line">Line</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button
-                  variant={showVolume ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setShowVolume(!showVolume)}
-                >
-                  <Volume2 className="w-4 h-4 mr-1" />
-                  Volume
-                </Button>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {chartType === 'candlestick' ? (
-              <TradingViewChart 
-                data={generatePriceHistory(cryptoData, mainChartTimeframe, 100)} 
-                showVolume={showVolume}
-                height={400}
-              />
-            ) : (
-              <div className="h-96 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  {chartType === 'area' ? (
-                    <ComposedChart data={priceHistory.slice(-100)}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis 
-                        dataKey="date" 
-                        stroke="hsl(var(--muted-foreground))"
-                        fontSize={12}
-                      />
-                      <YAxis 
-                        yAxisId="price"
-                        stroke="hsl(var(--muted-foreground))"
-                        fontSize={12}
-                        tickFormatter={(value) => `$${value.toFixed(2)}`}
-                      />
-                      {showVolume && (
-                        <YAxis 
-                          yAxisId="volume"
-                          orientation="right"
-                          stroke="hsl(var(--muted-foreground))"
-                          fontSize={12}
-                          tickFormatter={(value) => `${(value / 1e6).toFixed(0)}M`}
-                        />
-                      )}
-                      <Tooltip 
-                        contentStyle={{
-                          backgroundColor: 'hsl(var(--card))',
-                          border: '1px solid hsl(var(--border))',
-                          borderRadius: '8px',
-                          color: 'hsl(var(--foreground))'
-                        }}
-                        formatter={(value: any, name: string) => {
-                          if (name === 'close') return [`$${Number(value).toFixed(4)}`, 'Close'];
-                          if (name === 'volume') return [`$${(Number(value) / 1e6).toFixed(2)}M`, 'Volume'];
-                          return [value, name];
-                        }}
-                      />
-                      <Area
-                        yAxisId="price"
-                        type="monotone"
-                        dataKey="close"
-                        stroke="hsl(var(--primary))"
-                        fill="hsl(var(--primary))"
-                        fillOpacity={0.3}
-                        strokeWidth={2}
-                      />
-                      {showVolume && (
-                        <Bar
-                          yAxisId="volume"
-                          dataKey="volume"
-                          fill="hsl(var(--muted))"
-                          opacity={0.3}
-                        />
-                      )}
-                    </ComposedChart>
-                  ) : (
-                    <RechartsLineChart data={priceHistory.slice(-100)}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis 
-                        dataKey="date" 
-                        stroke="hsl(var(--muted-foreground))"
-                        fontSize={12}
-                      />
-                      <YAxis 
-                        stroke="hsl(var(--muted-foreground))"
-                        fontSize={12}
-                        tickFormatter={(value) => `$${value.toFixed(2)}`}
-                      />
-                      <Tooltip 
-                        contentStyle={{
-                          backgroundColor: 'hsl(var(--card))',
-                          border: '1px solid hsl(var(--border))',
-                          borderRadius: '8px',
-                          color: 'hsl(var(--foreground))'
-                        }}
-                        formatter={(value: any) => [`$${Number(value).toFixed(4)}`, 'Price']}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="close"
-                        stroke="hsl(var(--primary))"
-                        strokeWidth={2}
-                        dot={false}
-                      />
-                      {technicalIndicators.sma_20 && (
-                        <Line
-                          type="monotone"
-                          dataKey={() => technicalIndicators.sma_20}
-                          stroke="hsl(var(--crypto-orange))"
-                          strokeWidth={1}
-                          strokeDasharray="5 5"
-                          dot={false}
-                        />
-                      )}
-                    </RechartsLineChart>
-                  )}
-                </ResponsiveContainer>
-              </div>
-            )}
-            
-            {technicalIndicators.rsi && (
-              <div className="mt-4 p-4 bg-muted/50 rounded-lg">
-                <div className="flex items-center justify-between text-sm">
-                  <span>Technical Indicators:</span>
-                  <div className="flex gap-4">
-                    {technicalIndicators.sma_20 && (
-                      <span>SMA(20): <span className="font-mono">${technicalIndicators.sma_20.toFixed(2)}</span></span>
-                    )}
-                    {technicalIndicators.rsi && (
-                      <span>RSI(14): <span className={`font-mono ${technicalIndicators.rsi > 70 ? 'text-crypto-red' : technicalIndicators.rsi < 30 ? 'text-crypto-green' : 'text-foreground'}`}>{technicalIndicators.rsi.toFixed(1)}</span></span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        {/* Professional Trading Chart */}
+        <ProfessionalTradingChart cryptoData={cryptoData} height={600} />
 
         {/* Detailed Information Tabs */}
         <Tabs defaultValue="overview" className="w-full">
